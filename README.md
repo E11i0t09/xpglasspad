@@ -2,6 +2,8 @@
 
 **Turn your iPad (or any tablet) into a touch bezel for the X-Plane 12 G1000 and GNS 430/530 — no popups, no second monitor.**
 
+> **Free community project – not for sale.** Free to use for everyone, including companies and flight schools. See [License](#license).
+
 ![XPGlassPad on an iPad: G1000 PFD with the live X-Plane 12 screen inside a touch bezel](screenshots/ipad_g1000_pfd.jpg)
 
 *G1000 PFD of the default Cessna 172 on an iPad. The screen is the real one from X-Plane, the keys and knobs around it work by touch.*
@@ -99,10 +101,11 @@ release ZIP. UI development without X-Plane: `python3 tools/mock.py web pfd1,mfd
 
 © E11i0t09 – licensed under [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)](LICENSE).
 
-- **No commercial use** – you may not sell it, bundle it with paid products or use it commercially in any other way.
-- You may share and adapt it for non-commercial purposes, as long as you give appropriate credit and share your changes under the same license.
+**Additional permission:** anyone – including companies, schools and flight schools – may download and use XPGlassPad free of charge, also in a commercial environment (e.g. training, simulators, operations).
 
-Release v1.0.0 was published under CC BY 4.0 and remains available under it.
+**Not allowed** without written permission: selling or renting it, bundling it with paid products or services, charging for downloads, or distributing modified versions commercially.
+
+You may share and adapt it non-commercially, as long as you give appropriate credit and share your changes under the same license. Copies of v1.0.0 obtained before 21 October 2026 were licensed under CC BY 4.0.
 
 Bundled third-party code keeps its own license – see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
