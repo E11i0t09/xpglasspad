@@ -68,4 +68,4 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: XPGlassPad-${{ env.VERSION }}.zip
-          body_path: .github/release-notes.md
+          # release notes are written on the GitHub release page; this step only attaches the ZIP
