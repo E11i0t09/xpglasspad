@@ -96,8 +96,14 @@ Pushing a tag `vX.Y.Z` builds all three platforms on GitHub Actions and publishe
 release ZIP. UI development without X-Plane: `python3 tools/mock.py web pfd1,mfd 8099`.
 
 ## License
-© E11i0t09 – licensed under [Creative Commons Attribution 4.0 International (CC BY 4.0)](LICENSE).
-You may share and adapt it, also commercially, as long as you give appropriate credit.
+
+© E11i0t09 – licensed under [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)](LICENSE).
+
+- **No commercial use** – you may not sell it, bundle it with paid products or use it commercially in any other way.
+- You may share and adapt it for non-commercial purposes, as long as you give appropriate credit and share your changes under the same license.
+
+Release v1.0.0 was published under CC BY 4.0 and remains available under it.
+
 Bundled third-party code keeps its own license – see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Garmin, G1000, GNS 430 and GNS 530 are trademarks of Garmin Ltd. X-Plane is a trademark
