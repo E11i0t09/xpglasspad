@@ -13,6 +13,14 @@ tablet. You fly the bezel around it — keys, dual concentric knobs, softkeys �
 > Tested on Windows / X-Plane 12.4 with iPad and iPhone. macOS and Linux builds are made
 > automatically by GitHub Actions but have not been tested yet — feedback very welcome.
 
+## Screenshots
+
+Captured from the running app with the live X-Plane 12 screen (default Cessna 172 with GNS 530 + GNS 430):
+
+| GNS 530 | GNS 430 |
+|---|---|
+| ![GNS 530 bezel with the live X-Plane moving map](screenshots/gns530.jpg) | ![GNS 430 bezel with the live X-Plane nav page](screenshots/gns430.jpg) |
+
 ## Features
 - **Automatic device detection** – the plugin asks X-Plane which avionics the loaded
   aircraft uses and the tablet shows the matching unit:
