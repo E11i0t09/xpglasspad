@@ -1,7 +1,7 @@
 # Third-party notices
 
 XPGlassPad includes the following third-party code. Their licenses apply to those
-files only; everything else in this repository is licensed under CC BY 4.0 (see LICENSE).
+files only; everything else in this repository is licensed under CC BY-NC-SA 4.0 (see LICENSE).
 
 ## cpp-httplib 0.18.3 — `third_party/httplib.h`
 https://github.com/yhirose/cpp-httplib
