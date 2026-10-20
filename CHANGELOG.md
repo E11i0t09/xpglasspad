@@ -1,7 +1,7 @@
 # Changelog
 
 ## v1.0.1
-- License changed to **CC BY-NC-SA 4.0**: no commercial use, changes must be shared under the same license. No functional changes. v1.0.0 remains available under CC BY 4.0.
+- Free community project – not for sale. License changed to **CC BY-NC-SA 4.0** with an additional permission: free use for everyone, including companies and flight schools; selling, bundling with paid products, paid downloads and commercial distribution of modified versions are not allowed. No functional changes.
 
 ## v1.0.0
 First public release.
