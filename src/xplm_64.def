@@ -1,0 +1,19 @@
+LIBRARY XPLM_64.dll
+EXPORTS
+  XPLMCommandBegin
+  XPLMCommandEnd
+  XPLMCommandOnce
+  XPLMDebugString
+  XPLMEnableFeature
+  XPLMFindCommand
+  XPLMFindDataRef
+  XPLMGetDatab
+  XPLMGetElapsedTime
+  XPLMGetMyID
+  XPLMGetNthAircraftModel
+  XPLMGetPluginInfo
+  XPLMIsAvionicsBound
+  XPLMRegisterAvionicsCallbacksEx
+  XPLMRegisterFlightLoopCallback
+  XPLMUnregisterAvionicsCallbacks
+  XPLMUnregisterFlightLoopCallback

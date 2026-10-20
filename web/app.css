@@ -1,0 +1,289 @@
+/* XP GlassPad – bezel styling
+   Everything inside #bezel is laid out in fixed "design units" and scaled to the
+   viewport by app.js, so proportions stay true to the real units. */
+
+:root {
+  /* speckle mask = worn silk-screen print */
+  --worn: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='w'><feTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' seed='7'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -2.3 2.3'/></filter><rect width='100%' height='100%' filter='url(%23w)'/></svg>");
+  --bezel: #222326;
+  --bezel-hi: #2d2e32;
+  --ink: #dcdcd8;          /* printed bezel lettering, slightly warm/faded */
+  --key-top: #3a3b3f;
+  --key-bot: #26272a;
+  --key-ink: #ecebe6;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; height: 100%; background: #070708; overflow: hidden;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  touch-action: none; overscroll-behavior: none;
+}
+#stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+#bezel-wrap { position: relative; }
+#bezel { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+
+/* ------------------------------------------------------------ bezel body */
+.bz {
+  position: absolute; border-radius: 16px;
+  background:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .07 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"),
+    radial-gradient(120% 90% at 30% 10%, rgba(255,255,255,.05), rgba(0,0,0,0) 60%),
+    linear-gradient(180deg, var(--bezel-hi), var(--bezel) 30%, #1b1c1e);
+  box-shadow:
+    0 30px 60px rgba(0,0,0,.65),
+    inset 0 2px 0 rgba(255,255,255,.07),
+    inset 0 -3px 6px rgba(0,0,0,.6),
+    inset 3px 0 4px rgba(255,255,255,.025),
+    inset -3px 0 6px rgba(0,0,0,.35);
+}
+/* fingerprints / smudges: very faint, only visible in the light */
+.bz::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background:
+    radial-gradient(60px 40px at 12% 62%, rgba(255,255,255,.025), transparent 70%),
+    radial-gradient(80px 50px at 91% 74%, rgba(255,255,255,.03), transparent 70%),
+    radial-gradient(50px 70px at 88% 30%, rgba(255,255,255,.02), transparent 70%),
+    radial-gradient(90px 40px at 50% 98%, rgba(255,255,255,.025), transparent 70%);
+}
+
+/* recessed screen area */
+.recess {
+  position: absolute; background: #0d0e0f; border-radius: 6px;
+  box-shadow: inset 0 3px 8px rgba(0,0,0,.9), inset 0 -1px 0 rgba(255,255,255,.05), 0 1px 0 rgba(255,255,255,.05);
+}
+.screen {
+  position: absolute; background: #000; overflow: hidden; border-radius: 3px;
+  box-shadow: inset 0 0 0 2px #050505;
+}
+.screen img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; display: block; }
+.screen .glass {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(155deg, rgba(255,255,255,.06), rgba(255,255,255,0) 35%, rgba(255,255,255,0) 70%, rgba(255,255,255,.025));
+}
+.screen .wait {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center;
+  color: #5d6066; font-size: 22px; letter-spacing: .5px; line-height: 1.5; padding: 30px;
+}
+.screen.live .wait { display: none; }
+
+/* ------------------------------------------------------------ printed lettering */
+.lbl {
+  position: absolute; transform: translate(-50%, -50%); white-space: nowrap; text-align: center;
+  color: var(--ink); font-weight: 700; letter-spacing: .4px; line-height: 1;
+  text-shadow: 0 1px 0 rgba(0,0,0,.6);
+  pointer-events: none;
+  -webkit-mask-image: var(--worn); mask-image: var(--worn);
+}
+.lbl.sm { font-size: 11px; font-weight: 600; opacity: .88; }
+.lbl.md { font-size: 15px; }
+.lbl.lg { font-size: 21px; }
+.lbl.stack { line-height: 1.05; }
+.lbl svg { vertical-align: middle; }
+
+/* ------------------------------------------------------------ keys */
+.key {
+  position: absolute; transform: translate(-50%, -50%);
+  border-radius: 6px; border: 1px solid #0d0d0e;
+  background: linear-gradient(180deg, var(--key-top), var(--key-bot));
+  box-shadow:
+    0 4px 5px rgba(0,0,0,.65),
+    0 1px 1px rgba(0,0,0,.8),
+    inset 0 1px 0 rgba(255,255,255,.13),
+    inset 0 -2px 3px rgba(0,0,0,.45);
+  color: var(--key-ink); font-weight: 700; font-size: 15px; letter-spacing: .6px;
+  display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.05;
+  transition: transform 40ms, box-shadow 40ms;
+  touch-action: none; overflow: hidden;
+}
+.key::before { /* edge wear: lighter rubbed corners */
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background:
+    radial-gradient(14px 10px at 4% 8%, rgba(255,255,255,var(--wa,.05)), transparent 80%),
+    radial-gradient(14px 10px at 96% 8%, rgba(255,255,255,var(--wb,.04)), transparent 80%);
+}
+.key::after { /* polished spot where the finger lands */
+  content: ""; position: absolute; pointer-events: none;
+  left: var(--px, 50%); top: var(--py, 55%); width: 70%; height: 80%;
+  transform: translate(-50%, -50%); border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255,255,255,var(--pol,.05)), transparent);
+}
+.key span {
+  position: relative; opacity: var(--ink-op, .92);
+  -webkit-mask-image: var(--worn); mask-image: var(--worn);
+  -webkit-mask-position: var(--mx, 0) var(--my, 0); mask-position: var(--mx, 0) var(--my, 0);
+}
+.key.down {
+  transform: translate(-50%, calc(-50% + 2px));
+  box-shadow: 0 1px 2px rgba(0,0,0,.7), inset 0 2px 4px rgba(0,0,0,.55), inset 0 -1px 0 rgba(255,255,255,.04);
+  background: linear-gradient(180deg, #2c2d30, #232427);
+}
+.key.soft { border-radius: 5px; }
+.key.tall { flex-direction: column; gap: 4px; }
+
+/* ------------------------------------------------------------ knobs */
+.knob { position: absolute; transform: translate(-50%, -50%); touch-action: none; }
+.knob .hit { position: absolute; border-radius: 50%; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+.ring, .cap {
+  position: absolute; left: 50%; top: 50%; border-radius: 50%; transform: translate(-50%, -50%);
+}
+.ring .knurl, .cap .knurl {
+  position: absolute; inset: 0; border-radius: 50%;
+  background:
+    repeating-conic-gradient(from 0deg, #141415 0deg 3.2deg, #2f3033 3.2deg 5.6deg, #1d1e20 5.6deg 7.2deg);
+}
+.ring .shade, .cap .shade {
+  position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255,255,255,.22), rgba(255,255,255,0) 45%),
+    radial-gradient(circle at 70% 85%, rgba(0,0,0,.55), rgba(0,0,0,0) 60%);
+}
+.ring {
+  box-shadow: 0 8px 12px rgba(0,0,0,.75), 0 2px 3px rgba(0,0,0,.9), 0 0 0 2px #0b0b0c;
+}
+.ring::after { /* skirt shadow onto bezel */
+  content: ""; position: absolute; inset: -6px; border-radius: 50%; z-index: -1;
+  background: radial-gradient(closest-side, rgba(0,0,0,.55), transparent);
+}
+.cap { box-shadow: 0 5px 8px rgba(0,0,0,.8), 0 0 0 1.5px #0a0a0a; }
+.cap .face { /* flat top of the inner knob */
+  position: absolute; left: 50%; top: 50%; width: 78%; height: 78%; transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #3b3c40, #232427 55%, #161718);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.12), inset 0 -2px 3px rgba(0,0,0,.5);
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  color: var(--ink); font-weight: 700; line-height: 1.02; font-size: 12px; letter-spacing: .4px;
+}
+.cap .face .rot { position: absolute; inset: 0; border-radius: 50%; }
+.cap .face .rot::before { /* tiny index dot that turns with the knob */
+  content: ""; position: absolute; left: 50%; top: 9%; width: 4px; height: 4px; margin-left: -2px;
+  border-radius: 50%; background: rgba(255,255,255,.18);
+}
+.knob.active .ring.on, .knob.active .cap.on { filter: brightness(1.18); }
+.knob.pushed .cap { transform: translate(-50%, -50%) scale(.965); }
+
+/* screws / photocell / slots */
+.screw {
+  position: absolute; width: 22px; height: 22px; border-radius: 50%; transform: translate(-50%, -50%);
+  background: radial-gradient(circle at 35% 30%, #4a4b4f, #1c1d1f 70%);
+  box-shadow: inset 0 0 0 1px #0c0c0d, 0 1px 1px rgba(255,255,255,.05);
+}
+.screw::after {
+  content: ""; position: absolute; left: 3px; right: 3px; top: 50%; height: 3px; margin-top: -1.5px;
+  background: #0c0c0d; transform: rotate(var(--r, 30deg)); border-radius: 1px;
+}
+.cell {
+  position: absolute; border-radius: 50%; transform: translate(-50%, -50%);
+  background: radial-gradient(circle at 35% 30%, #5b5345, #1a1814 60%);
+  box-shadow: inset 0 0 0 1px #000, 0 1px 0 rgba(255,255,255,.06);
+}
+.slot {
+  position: absolute; background: #0b0b0c; border-radius: 3px;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,.95), 0 1px 0 rgba(255,255,255,.05);
+}
+.pocket { /* recessed well around a key */
+  position: absolute; border-radius: 12px; background: #141516;
+  box-shadow: inset 0 2px 5px rgba(0,0,0,.85), inset 0 -1px 0 rgba(255,255,255,.05), 0 1px 0 rgba(255,255,255,.04);
+}
+.strip { /* raised panel carrying the bottom key row */
+  position: absolute; border-radius: 8px;
+  background: linear-gradient(180deg, #2a2b2e, #1f2022);
+  box-shadow: 0 3px 6px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.07), inset 0 -2px 3px rgba(0,0,0,.4);
+}
+.tick { position: absolute; width: 2px; height: 7px; background: var(--ink); opacity: .55; transform: translateX(-50%); }
+
+/* ------------------------------------------------------------ top handle + bar */
+#handle {
+  position: fixed; top: max(4px, env(safe-area-inset-top)); left: 50%; width: 120px; height: 26px; margin-left: -60px; z-index: 20;
+}
+#handle::after {
+  content: ""; position: absolute; left: 35px; right: 35px; top: 9px; height: 5px; border-radius: 3px;
+  background: rgba(255,255,255,.14);
+}
+#bar {
+  position: fixed; left: 50%; top: max(8px, env(safe-area-inset-top)); transform: translateX(-50%);
+  z-index: 30; min-width: 520px; max-width: 96vw;
+  background: rgba(22,23,25,.92); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255,255,255,.08); border-radius: 14px; padding: 10px 14px;
+  color: #cfd0cc; font-size: 15px; box-shadow: 0 12px 30px rgba(0,0,0,.6);
+  transition: opacity .2s, transform .2s;
+}
+#bar.hidden { opacity: 0; transform: translate(-50%, -12px); pointer-events: none; }
+.bar-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.bar-row + .bar-row { margin-top: 8px; }
+.bar-row.small { font-size: 13px; color: #9c9e9a; gap: 16px; }
+.bar-row.small input { vertical-align: -2px; }
+#acf { font-weight: 700; color: #fff; margin-right: 6px; }
+#devs { display: flex; gap: 6px; flex-wrap: wrap; }
+#devs button {
+  font: inherit; font-size: 14px; font-weight: 600; color: #ddd; padding: 7px 12px; border-radius: 9px;
+  border: 1px solid rgba(255,255,255,.1); background: #2a2b2e;
+}
+#devs button.sel { background: #e8e8e4; color: #111; }
+#devs button.off { opacity: .35; }
+#stats { margin-left: auto; font-variant-numeric: tabular-nums; }
+
+#toast {
+  position: fixed; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%);
+  background: rgba(30,31,34,.92); color: #ddd; padding: 9px 16px; border-radius: 10px; font-size: 14px; z-index: 40;
+  transition: opacity .25s;
+}
+#toast.hidden { opacity: 0; pointer-events: none; }
+
+/* ============================================================ GNS 430/530 (matte black Garmin look) */
+#bezel[data-kind^="gns"] { --ink: #eeeeea; --gfont: "Segoe UI", "Myriad Pro", -apple-system, "Helvetica Neue", Arial, sans-serif; }
+#bezel[data-kind^="gns"] .bz {
+  background:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"),
+    radial-gradient(120% 90% at 30% 8%, rgba(255,255,255,.035), rgba(0,0,0,0) 60%),
+    linear-gradient(180deg, #19191b, #131315 35%, #0f0f10);
+  border-radius: 14px;
+}
+#bezel[data-kind^="gns"] .lbl { font-family: var(--gfont); font-weight: 500; letter-spacing: .2px; }
+#bezel[data-kind^="gns"] .lbl.md { font-size: 17px; }
+#bezel[data-kind^="gns"] .recess { border-radius: 4px; background: #0a0a0b;
+  box-shadow: inset 0 0 0 1.5px #232325, inset 0 3px 6px rgba(0,0,0,.9); }
+
+#bezel[data-kind^="gns"] .key {
+  border-radius: 9px; border: 1px solid #000;
+  background: radial-gradient(130% 100% at 50% 15%, #2a2a2d, #18181a 55%, #111112);
+  box-shadow: 0 3px 4px rgba(0,0,0,.8), 0 1px 1px rgba(0,0,0,.9),
+              inset 0 1px 0 rgba(255,255,255,.13), inset 0 -3px 4px rgba(0,0,0,.55);
+  color: #f2f2ee; font-family: var(--gfont); font-weight: 500; font-size: 18px; letter-spacing: .2px;
+}
+#bezel[data-kind^="gns"] .key.down {
+  background: radial-gradient(130% 100% at 50% 15%, #1d1d20, #121214 60%);
+  box-shadow: 0 1px 1px rgba(0,0,0,.9), inset 0 2px 4px rgba(0,0,0,.7);
+}
+#bezel[data-kind^="gns"] .pocket {
+  border-radius: 13px; background: #0b0b0c;
+  box-shadow: inset 0 0 0 1.5px #2b2b2e, inset 0 3px 6px rgba(0,0,0,.85), 0 1px 0 rgba(255,255,255,.04);
+}
+#bezel[data-kind^="gns"] .strip {
+  border-radius: 6px; background: linear-gradient(180deg, #161618, #111113);
+  box-shadow: inset 0 0 0 1.5px #27272a, inset 0 1px 0 rgba(255,255,255,.06), 0 2px 4px rgba(0,0,0,.6);
+}
+
+/* GNS knobs seen from the front: flat matte top, coarse ribs = notches on the rim */
+.gnsk { box-shadow: none !important; filter: drop-shadow(0 5px 5px rgba(0,0,0,.85)) drop-shadow(0 1px 1px rgba(0,0,0,.9)); }
+.gnsk::after { display: none; }
+.gnsk .knurl {
+  background:
+    radial-gradient(closest-side, rgba(0,0,0,0) calc(100% - var(--tooth) - 2px), rgba(255,255,255,.07) calc(100% - var(--tooth) - 1px), rgba(0,0,0,0) calc(100% - var(--tooth) + 1px)),
+    radial-gradient(circle at 38% 30%, #2c2c30, #161618 52%, #0b0b0c 100%);
+  -webkit-mask:
+    radial-gradient(closest-side, #000 calc(100% - var(--tooth)), transparent calc(100% - var(--tooth) + .6px)),
+    repeating-conic-gradient(#000 0deg calc(var(--tp) * .55), transparent calc(var(--tp) * .55) var(--tp));
+  mask:
+    radial-gradient(closest-side, #000 calc(100% - var(--tooth)), transparent calc(100% - var(--tooth) + .6px)),
+    repeating-conic-gradient(#000 0deg calc(var(--tp) * .55), transparent calc(var(--tp) * .55) var(--tp));
+}
+.gnsk .shade {
+  background: radial-gradient(circle at 34% 26%, rgba(255,255,255,.12), rgba(255,255,255,0) 42%);
+  -webkit-mask: radial-gradient(closest-side, #000 calc(100% - var(--tooth)), transparent calc(100% - var(--tooth) + .6px));
+  mask: radial-gradient(closest-side, #000 calc(100% - var(--tooth)), transparent calc(100% - var(--tooth) + .6px));
+}
+.cap.gnsk { filter: drop-shadow(0 7px 6px rgba(0,0,0,.9)) drop-shadow(0 0 1px #000); }
+.face.gtxt { width: 100%; height: 100%; background: none; box-shadow: none; font-family: var(--gfont); font-weight: 500; color: #eee; }
+.knob.active .gnsk.on { filter: brightness(1.25) drop-shadow(0 5px 5px rgba(0,0,0,.85)); }

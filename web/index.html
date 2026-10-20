@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GlassPad">
+<meta name="theme-color" content="#0b0b0c">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>XP GlassPad</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div id="stage">
+    <div id="bezel-wrap"><div id="bezel"></div></div>
+  </div>
+
+  <div id="handle" aria-label="Menu"></div>
+  <div id="bar" class="hidden">
+    <div class="bar-row">
+      <div id="acf">—</div>
+      <div id="devs"></div>
+    </div>
+    <div class="bar-row small">
+      <label><input type="checkbox" id="opt-sound" checked> Click sound</label>
+      <label><input type="checkbox" id="opt-ap" checked> AP keys (G1000)</label>
+      <label><input type="checkbox" id="opt-auto" checked> Pick device automatically</label>
+      <span id="stats"></span>
+    </div>
+  </div>
+
+  <div id="toast" class="hidden"></div>
+  <script src="app.js"></script>
+</body>
+</html>
