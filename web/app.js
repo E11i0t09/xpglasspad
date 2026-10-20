@@ -181,12 +181,13 @@ function gns530(P) {
   L(904, 24, 'GNS 530', 'md');
 
   // ---- left: flip-flop keys in pockets that run into the screen frame, tiny volume knobs
-  pocket(96, 66, 104, 104);
+  // pockets hug the keys (14 px margin) and stay clear of the screen frame
+  pocket(100, 67, 80, 102);
   K(140, 118, 52, 74, 'C<br>' + SVG.flipV, 'com_ff', 'tall');
   items.push({ t: 'knob', x: 88, y: 196, r: 16, hitR: 34, single: [P + 'cvol_up', P + 'cvol_dn'], push: P + 'cvol', capText: '.C' });
   L(70, 254, '<span style="font-size:10px">PWR</span><br><span style="font-size:14px">VOL</span><br><span style="font-size:10px">PUSH</span><br><span style="font-size:14px">SQ</span>', 'sm stack');
-  pocket(104, 206, 96, 104);
-  K(146, 258, 52, 74, 'V<br>' + SVG.flipV, 'nav_ff', 'tall');
+  pocket(100, 207, 80, 102);
+  K(140, 258, 52, 74, 'V<br>' + SVG.flipV, 'nav_ff', 'tall');
   items.push({ t: 'knob', x: 84, y: 334, r: 16, hitR: 34, single: [P + 'vvol_up', P + 'vvol_dn'], push: P + 'vvol', capText: '.V' });
   L(96, 380, '<span style="font-size:14px">VOL</span><span style="font-size:10px;vertical-align:7px">PUSH</span><br><span style="margin-left:30px;font-size:14px">ID</span>', 'sm stack');
 
@@ -228,9 +229,9 @@ function gns430(P) {
   L(80, 122, '<span style="font-size:10px">PWR</span> <span style="font-size:10px;vertical-align:4px">PUSH</span><br><span style="font-size:14px">VOL&nbsp;&nbsp;SQ</span>', 'sm stack');
   items.push({ t: 'knob', x: 84, y: 184, r: 20, hitR: 38, single: [P + 'vvol_up', P + 'vvol_dn'], push: P + 'vvol', capText: '.V' });
   L(90, 230, '<span style="font-size:14px">VOL</span><span style="font-size:10px;vertical-align:7px">PUSH</span><br><span style="margin-left:30px;font-size:14px">ID</span>', 'sm stack');
-  pocket(156, 58, 106, 100);
+  pocket(156, 55, 80, 106);
   K(196, 108, 52, 78, 'C<br>' + SVG.flipV, 'com_ff', 'tall');
-  pocket(156, 182, 106, 100);
+  pocket(156, 179, 80, 106);
   K(196, 232, 52, 78, 'V<br>' + SVG.flipV, 'nav_ff', 'tall');
   L(176, 312, 'COM<span style="font-size:24px;font-weight:400;margin:0 1px">/</span><span style="font-size:13px">VLOC</span>', 'md');
   items.push({ t: 'knob', x: 104, y: 404, r: 62, ri: 38, outer: [P + 'coarse_up', P + 'coarse_down'], inner: [P + 'fine_up', P + 'fine_down'], push: P + 'nav_com_tog' });
