@@ -19,6 +19,10 @@ DIAGNOSTICS   http://<PC-IP>:8090/api/status   and  "XPGlassPad:" lines in Log.t
 macOS: if Gatekeeper blocks the plugin:
   xattr -dr com.apple.quarantine "<X-Plane 12>/Resources/plugins/XPGlassPad"
 
-License: CC BY-NC-SA 4.0 (c) E11i0t09 – no commercial use, see LICENSE.
+FREE COMMUNITY PROJECT - NOT FOR SALE
+  Free to use for everyone, including companies and flight schools.
+  Not allowed: selling or renting it, bundling it with paid products or services,
+  charging for downloads, or distributing modified versions commercially.
+  License: CC BY-NC-SA 4.0 + additional permission (c) E11i0t09, see LICENSE.
 Third-party notices in THIRD_PARTY_NOTICES.md
 Not affiliated with Garmin or Laminar Research.
