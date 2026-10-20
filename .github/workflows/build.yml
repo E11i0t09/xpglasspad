@@ -1,0 +1,71 @@
+name: build
+
+# Builds win.xpl, lin.xpl and mac.xpl on every push / pull request.
+# Pushing a tag like v1.0.0 additionally creates a GitHub Release with the ready-to-install ZIP.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux-windows:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install mingw-w64
+        run: sudo apt-get update && sudo apt-get install -y g++-mingw-w64-x86-64-posix
+      - name: Build Windows + Linux
+        run: |
+          sudo update-alternatives --set x86_64-w64-mingw32-g++ /usr/bin/x86_64-w64-mingw32-g++-posix
+          ./build.sh all
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xpl-win-lin
+          path: |
+            dist/XPGlassPad/64/win.xpl
+            dist/XPGlassPad/64/lin.xpl
+
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build macOS (universal arm64 + x86_64)
+        run: ./build.sh mac
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xpl-mac
+          path: dist/XPGlassPad/64/mac.xpl
+
+  package:
+    needs: [linux-windows, macos]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Assemble plugin folder
+        run: |
+          mkdir -p dist/XPGlassPad/64
+          cp artifacts/xpl-win-lin/win.xpl artifacts/xpl-win-lin/lin.xpl artifacts/xpl-mac/mac.xpl dist/XPGlassPad/64/
+          cp -r web dist/XPGlassPad/web
+          cp dist-files/config.ini dist-files/README.txt LICENSE THIRD_PARTY_NOTICES.md dist/XPGlassPad/
+          VERSION="${GITHUB_REF_NAME}"
+          [[ "$GITHUB_REF_TYPE" == "tag" ]] || VERSION="dev-${GITHUB_SHA::7}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          cd dist && zip -r "../XPGlassPad-${VERSION}.zip" XPGlassPad
+      - uses: actions/upload-artifact@v4
+        with:
+          name: XPGlassPad-${{ env.VERSION }}
+          path: XPGlassPad-${{ env.VERSION }}.zip
+      - name: Create release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: XPGlassPad-${{ env.VERSION }}.zip
+          body_path: .github/release-notes.md
