@@ -2,12 +2,16 @@
 
 **Turn your iPad (or any tablet) into a touch bezel for the X-Plane 12 G1000 and GNS 430/530 — no popups, no second monitor.**
 
+![XPGlassPad on an iPad: G1000 PFD with the live X-Plane 12 screen inside a touch bezel](screenshots/ipad_g1000_pfd.jpg)
+
+*G1000 PFD of the default Cessna 172 on an iPad. The screen is the real one from X-Plane, the keys and knobs around it work by touch.*
+
 XPGlassPad is a small X-Plane 12 plugin plus a web app. The plugin reads the real
 screen of the built-in avionics straight from the simulator and streams it to your
 tablet. You fly the bezel around it — keys, dual concentric knobs, softkeys — by touch.
 
-> Developed on Windows / X-Plane 12.4. macOS and Linux builds are made automatically
-> by GitHub Actions but have not been tested yet — feedback very welcome.
+> Tested on Windows / X-Plane 12.4 with iPad and iPhone. macOS and Linux builds are made
+> automatically by GitHub Actions but have not been tested yet — feedback very welcome.
 
 ## Features
 - **Automatic device detection** – the plugin asks X-Plane which avionics the loaded
