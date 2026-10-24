@@ -182,6 +182,8 @@ struct Device {
   const char *name;    // display name
   const char *kind;    // g1000 | gns430 | gns530
   const char *prefix;  // command prefix
+  bool text = false;   // true = add-on unit drawn by the app from datarefs (ToLiss MCDU), no capture
+  int lam = 0;         // Laminar FMS unit (1/2): screen text comes from sim/cockpit2/radios/indicators/fms_cduN_*
   XPLMAvionicsID av = nullptr;
   std::atomic<int> bound{0};
   std::atomic<double> lastWanted{0};
@@ -215,6 +217,16 @@ static Device gDev[] = {
     {xplm_device_GNS430_1, "gns430_1", "GNS 430 #1", "gns430", "sim/GPS/g430n1_"},
     {xplm_device_GNS530_2, "gns530_2", "GNS 530 #2", "gns530", "sim/GPS/g430n2_"},
     {xplm_device_GNS430_2, "gns430_2", "GNS 430 #2", "gns430", "sim/GPS/g430n2_"},
+    // Laminar's built-in FMS units (A330 MCDU, 737 / MD-82 CDU). Keys use sim/FMS/* and sim/FMS2/*
+    {xplm_device_MCDU_1, "mcdu_1", "MCDU 1", "mcdu", "sim/FMS/", false, 1},
+    {xplm_device_MCDU_2, "mcdu_2", "MCDU 2", "mcdu", "sim/FMS2/", false, 2},
+    {xplm_device_CDU739_1, "cdu739_1", "CDU 1", "cdu", "sim/FMS/", false, 1},
+    {xplm_device_CDU739_2, "cdu739_2", "CDU 2", "cdu", "sim/FMS2/", false, 2},
+    {xplm_device_CDU815_1, "cdu815_1", "CDU 1", "cdu", "sim/FMS/", false, 1},
+    {xplm_device_CDU815_2, "cdu815_2", "CDU 2", "cdu", "sim/FMS2/", false, 2},
+    // ToLiss A319/A320/A321: the MCDU is drawn by the add-on, we read its text datarefs (AirbusFBW/MCDUn*)
+    {-1, "tl_mcdu_1", "MCDU 1", "mcdu", "AirbusFBW/MCDU1", true, 0},
+    {-1, "tl_mcdu_2", "MCDU 2", "mcdu", "AirbusFBW/MCDU2", true, 0},
 };
 static const int kNumDev = sizeof(gDev) / sizeof(gDev[0]);
 
@@ -399,7 +411,220 @@ static void updateAircraft() {
   gAcfName = ui[0] ? ui : file;
 }
 
-static double gLastSlow = 0;
+// ---------------------------------------------------------------- generic dataref read (any numeric type)
+static int readNums(XPLMDataRef r, float *out, int n) {
+  if (!r) return 0;
+  int t = XPLMGetDataRefTypes(r);
+  if (t & 8) return XPLMGetDatavf(r, out, 0, n);
+  if (t & 16) { int tmp[64]; int k = XPLMGetDatavi(r, tmp, 0, n < 64 ? n : 64); for (int i = 0; i < k; i++) out[i] = (float)tmp[i]; return k; }
+  if (t & 2) { out[0] = XPLMGetDataf(r); return 1; }
+  if (t & 1) { out[0] = (float)XPLMGetDatai(r); return 1; }
+  return 0;
+}
+
+// ---------------------------------------------------------------- ToLiss MCDU text (14 lines x 24 chars)
+// Datarefs (24-byte strings) per colour a/b/g/m/s/w/y: title/stitle = line 0, labelN = line 2N-1 (small,
+// labelNL = large), contN = line 2N (large), scontN = small, spw/spa = scratchpad line 13.
+// 's' = symbol set: A/B = [ ], 0/1 = <- -> cyan, 2/3 white, 4/5 amber, E = amber box.
+struct TLUnit {
+  bool ok = false;
+  struct Src { XPLMDataRef r; int line; char col; bool small; };
+  std::vector<Src> src;
+  XPLMDataRef slew = nullptr, bright = nullptr;
+};
+static TLUnit gTL[2];
+static std::string gTLAcf;
+static bool tlFind(int u) {
+  TLUnit &t = gTL[u];
+  t = TLUnit();
+  std::string p = std::string("AirbusFBW/MCDU") + char('1' + u);
+  if (!XPLMFindDataRef((p + "cont1w").c_str())) return false;
+  const char *cols = "abgmswy";
+  auto add = [&](const std::string &n, int line, char col, bool small) {
+    XPLMDataRef r = XPLMFindDataRef((p + n).c_str());
+    if (r) t.src.push_back({r, line, col, small});
+  };
+  for (const char *c = cols; *c; c++) { add(std::string("title") + *c, 0, *c, false); add(std::string("stitle") + *c, 0, *c, true); }
+  for (int i = 1; i <= 6; i++) {
+    std::string n = std::to_string(i);
+    for (const char *c = cols; *c; c++) {
+      add("label" + n + *c, 2 * i - 1, *c, true);
+      add("cont" + n + *c, 2 * i, *c, false);
+      add("scont" + n + *c, 2 * i, *c, true);
+    }
+    add("label" + n + "Lg", 2 * i - 1, 'g', false);
+    add("label" + n + "Lw", 2 * i - 1, 'w', false);
+  }
+  add("spw", 13, 'w', false);
+  add("spa", 13, 'a', false);
+  t.slew = XPLMFindDataRef((p + "VertSlewKeys").c_str());
+  t.bright = XPLMFindDataRef("AirbusFBW/MCDUScreenBrightnessArray");
+  t.ok = true;
+  return true;
+}
+static void jsonStr(std::ostringstream &o, const std::string &s) {
+  o << '"';
+  for (char c : s) { if (c == '"' || c == '\\') o << '\\'; o << c; }
+  o << '"';
+}
+static void tlCapture(int u, Device &d) {
+  TLUnit &t = gTL[u];
+  std::string ch[14][24];
+  char col[14][25], sz[14][25];
+  for (int l = 0; l < 14; l++) { for (int i = 0; i < 24; i++) { ch[l][i] = " "; col[l][i] = 'w'; sz[l][i] = 'L'; } col[l][24] = sz[l][24] = 0; }
+  char buf[32];
+  for (auto &s : t.src) {
+    memset(buf, 0, sizeof buf);
+    int n = XPLMGetDatab(s.r, buf, 0, 24);
+    for (int i = 0; i < n && i < 24; i++) {
+      unsigned char c = (unsigned char)buf[i];
+      if (!c) { if (s.line == 13) break; continue; }   // scratchpad strings may carry junk after the 0
+      if (c == ' ') continue;
+      if (s.line == 13 && s.col == 'a' && i > 21) continue;
+      std::string g(1, (char)c);
+      char cc = s.col;
+      if (s.col == 's') {
+        switch (c) {
+          case 'A': g = "["; cc = 'b'; break;   case 'B': g = "]"; cc = 'b'; break;
+          case '0': g = "\u2190"; cc = 'b'; break; case '1': g = "\u2192"; cc = 'b'; break;
+          case '2': g = "\u2190"; cc = 'w'; break; case '3': g = "\u2192"; cc = 'w'; break;
+          case '4': g = "\u2190"; cc = 'a'; break; case '5': g = "\u2192"; cc = 'a'; break;
+          case 'E': g = "\u2610"; cc = 'a'; break;
+          default: cc = 'w';
+        }
+      } else if (c == '#') g = "\u2610";
+      else if (c == '`') g = "\u00b0";
+      else if (c < 32 || c > 126) continue;
+      ch[s.line][i] = g; col[s.line][i] = cc; sz[s.line][i] = s.small ? 'S' : 'L';
+    }
+  }
+  if (t.slew) {
+    int v = XPLMGetDatai(t.slew);
+    if (v == 1 || v == 3) { ch[13][22] = "\u2191"; col[13][22] = 'w'; sz[13][22] = 'L'; }
+    if (v == 2 || v == 3) { ch[13][23] = "\u2193"; col[13][23] = 'w'; sz[13][23] = 'L'; }
+  }
+  float br[4] = {1, 1, 1, 1};
+  readNums(t.bright, br, 4);
+  std::ostringstream o;
+  o << "{\"br\":" << (int)(br[u] * 100 + .5) / 100.0 << ",\"lines\":[";
+  for (int l = 0; l < 14; l++) {
+    std::string s;
+    for (int i = 0; i < 24; i++) s += ch[l][i];
+    o << (l ? "," : "") << "{\"t\":"; jsonStr(o, s); o << ",\"c\":\"" << col[l] << "\",\"s\":\"" << sz[l] << "\"}";
+  }
+  o << "]}";
+  std::string js = o.str();
+  {
+    std::lock_guard<std::mutex> l(d.jpgMx);
+    if (js != d.jpg) { d.jpg = js; d.seq++; d.w = 24; d.h = 14; }
+  }
+  d.jpgCv.notify_all();
+}
+
+// ---------------------------------------------------------------- Laminar FMS text (X-Plane 11.35+ CDU datarefs)
+// 16 lines x 24 chars, UTF-8; style byte per char: bit7 large, bit6 reverse, bit5 flash, bit4 underline, low nibble colour
+// (0 black 1 cyan 2 red 3 yellow 4 green 5 magenta 6 amber 7 white). The MCDU/CDU pages use lines 0-13 (13 = scratchpad/message).
+static XPLMDataRef gLamTxt[2][16], gLamSty[2][16];
+static void lamCapture(int u, Device &d) {
+  if (!gLamTxt[u][0]) {
+    for (int l = 0; l < 16; l++) {
+      gLamTxt[u][l] = XPLMFindDataRef(("sim/cockpit2/radios/indicators/fms_cdu" + std::to_string(u + 1) + "_text_line" + std::to_string(l)).c_str());
+      gLamSty[u][l] = XPLMFindDataRef(("sim/cockpit2/radios/indicators/fms_cdu" + std::to_string(u + 1) + "_style_line" + std::to_string(l)).c_str());
+    }
+    if (!gLamTxt[u][0]) return;
+  }
+  static const char COL[] = "kbrygmaw";
+  std::string ch[16][24];
+  char col[16][25], sz[16][25], fl[16][25];
+  bool used[16] = {false};
+  for (int l = 0; l < 16; l++) {
+    for (int i = 0; i < 24; i++) { ch[l][i] = " "; col[l][i] = 'w'; sz[l][i] = 'S'; fl[l][i] = '0'; }
+    col[l][24] = sz[l][24] = fl[l][24] = 0;
+    char buf[200]; memset(buf, 0, sizeof buf);
+    unsigned char st[24]; memset(st, 0, sizeof st);
+    int n = gLamTxt[u][l] ? XPLMGetDatab(gLamTxt[u][l], buf, 0, 199) : 0;
+    if (gLamSty[u][l]) XPLMGetDatab(gLamSty[u][l], st, 0, 24);
+    int i = 0;
+    for (int p = 0; p < n && buf[p] && i < 24; i++) {         // split UTF-8 into 24 cells
+      unsigned char c = (unsigned char)buf[p];
+      int len = c < 0x80 ? 1 : (c >> 5) == 6 ? 2 : (c >> 4) == 14 ? 3 : 4;
+      ch[l][i] = std::string(buf + p, len); p += len;
+      if (ch[l][i] != " ") used[l] = true;
+      unsigned char s = st[i];
+      col[l][i] = COL[s & 7]; sz[l][i] = (s & 0x80) ? 'L' : 'S';
+      fl[l][i] = "0123456789abcdef"[((s >> 6) & 1) | (((s >> 5) & 1) << 1) | (((s >> 4) & 1) << 2)];
+    }
+  }
+  // fold an extra message line (14/15) onto row 13 when row 13 is empty
+  int last = 13;
+  if (!used[13]) { if (used[14]) last = 14; else if (used[15]) last = 15; }
+  std::ostringstream o;
+  o << "{\"br\":1,\"lines\":[";
+  for (int r = 0; r < 14; r++) {
+    int l = r == 13 ? last : r;
+    std::string s;
+    for (int i = 0; i < 24; i++) s += ch[l][i];
+    o << (r ? "," : "") << "{\"t\":"; jsonStr(o, s);
+    o << ",\"c\":\"" << col[l] << "\",\"s\":\"" << sz[l] << "\",\"f\":\"" << fl[l] << "\"}";
+  }
+  o << "]}";
+  std::string js = o.str();
+  {
+    std::lock_guard<std::mutex> lk(d.jpgMx);
+    if (js != d.jpg) { d.jpg = js; d.seq++; d.w = 24; d.h = 14; }
+  }
+  d.jpgCv.notify_all();
+}
+
+// ---------------------------------------------------------------- panel lighting (for lit key labels / night look)
+// Read on the main thread, served from a snapshot. Which rheostat lights the avionics bezel differs per aircraft
+// (see the aircraft's .obj ATTR_light_level), so the web app picks the index; we just send the arrays.
+struct LightSnap { float inst[32] = {0}, instMan[32] = {0}, panel[4] = {0}, tlInteg[4] = {0}, tlAcv[8] = {0}; int avionics = 0, tlN = 0; bool tl = false; };
+static std::mutex gLightMx;
+static LightSnap gLight;
+static XPLMDataRef gInstRef, gInstManRef, gPanelRef, gAvionicsRef, gTlIntegRef, gTlAcvRef;
+static double gLastLight = 0;
+static void updateLight() {
+  if (!gInstRef) {
+    gInstRef = XPLMFindDataRef("sim/cockpit2/electrical/instrument_brightness_ratio");
+    gInstManRef = XPLMFindDataRef("sim/cockpit2/electrical/instrument_brightness_ratio_manual");
+    gPanelRef = XPLMFindDataRef("sim/cockpit2/electrical/panel_brightness_ratio");
+    gAvionicsRef = XPLMFindDataRef("sim/cockpit/electrical/avionics_on");
+  }
+  LightSnap s;
+  if (gInstRef) XPLMGetDatavf(gInstRef, s.inst, 0, 32);
+  if (gInstManRef) XPLMGetDatavf(gInstManRef, s.instMan, 0, 32);
+  if (gPanelRef) XPLMGetDatavf(gPanelRef, s.panel, 0, 4);
+  s.avionics = gAvionicsRef ? XPLMGetDatai(gAvionicsRef) : 1;
+  if (gTL[0].ok) {
+    if (!gTlIntegRef) { gTlIntegRef = XPLMFindDataRef("AirbusFBW/MCDUIntegBrightness"); gTlAcvRef = XPLMFindDataRef("AirbusFBW/ACBusVoltages"); }
+    s.tl = true;
+    s.tlN = readNums(gTlIntegRef, s.tlInteg, 4);
+    readNums(gTlAcvRef, s.tlAcv, 8);
+  } else gTlIntegRef = gTlAcvRef = nullptr;
+  std::lock_guard<std::mutex> l(gLightMx);
+  gLight = s;
+}
+static void lightJson(std::ostringstream &o) {
+  LightSnap s;
+  { std::lock_guard<std::mutex> l(gLightMx); s = gLight; }
+  auto arr = [&](const float *v, int n) {
+    o << "[";
+    for (int i = 0; i < n; i++) o << (i ? "," : "") << (int)(v[i] * 100 + .5) / 100.0;
+    o << "]";
+  };
+  o << ",\"light\":{\"avionics\":" << (s.avionics ? "true" : "false") << ",\"inst\":"; arr(s.inst, 32);
+  o << ",\"instMan\":"; arr(s.instMan, 32);
+  o << ",\"panel\":"; arr(s.panel, 4);
+  if (s.tl) {
+    float acv = 0; for (float v : s.tlAcv) acv = v > acv ? v : acv;
+    o << ",\"tlInteg\":"; arr(s.tlInteg, s.tlN > 0 ? s.tlN : 1);
+    o << ",\"tlPower\":" << (acv > 50 ? "true" : "false");
+  }
+  o << "}";
+}
+
+static double gLastSlow = 0, gLastText = 0;
 static float flightLoop(float, float, int, void *) {
   // commands
   std::deque<CmdReq> q;
@@ -424,10 +649,28 @@ static float flightLoop(float, float, int, void *) {
     if (t - it->second > 15.0) { XPLMCommandEnd(it->first); it = gHeld.erase(it); }
     else ++it;
   }
+  if (t - gLastLight > 0.2) { gLastLight = t; updateLight(); }
+  if (t - gLastText > 0.1) {
+    gLastText = t;
+    for (auto &d : gDev) {
+      if (d.lam && d.bound && t - d.lastWanted < gCfg.watchTimeout) { lamCapture(d.lam - 1, d); continue; }
+      if (!d.text) continue;
+      int u = d.key[8] - '1';
+      if (!gTL[u].ok) continue;
+      d.lastDraw = t;
+      if (t - d.lastWanted < gCfg.watchTimeout) tlCapture(u, d);
+    }
+  }
   if (t - gLastSlow > 1.0) {
     gLastSlow = t;
-    for (auto &d : gDev) d.bound = d.av ? XPLMIsAvionicsBound(d.av) : 0;
     updateAircraft();
+    {
+      std::string acf;
+      { std::lock_guard<std::mutex> l(gAcfMx); acf = gAcfFile; }
+      if (acf != gTLAcf) { gTLAcf = acf; gTL[0] = TLUnit(); gTL[1] = TLUnit(); }
+      for (int u = 0; u < 2; u++) if (!gTL[u].ok) tlFind(u);
+    }
+    for (auto &d : gDev) d.bound = d.text ? (gTL[d.key[8] - '1'].ok ? 1 : 0) : (d.av ? XPLMIsAvionicsBound(d.av) : 0);
   }
   flushLog();
   return -1.0f;
@@ -446,9 +689,9 @@ static std::string statusJson() {
     f = gAcfFile;
   }
   double t = nowSec();
-  o << "{\"plugin\":\"XPGlassPad\",\"version\":\"1.0\",\"aircraft\":\"" << jsonEsc(n)
+  o << "{\"plugin\":\"XPGlassPad\",\"version\":\"1.1\",\"aircraft\":\"" << jsonEsc(n)
     << "\",\"acf\":\"" << jsonEsc(f) << "\",\"fps\":" << gCfg.fps << ",\"pbo\":" << (gCfg.pbo && gPBOAvailable ? "true" : "false")
-    << ",\"devices\":[";
+    ; lightJson(o); o << ",\"devices\":[";
   bool first = true;
   for (auto &d : gDev) {
     if (!first) o << ",";
@@ -460,7 +703,7 @@ static std::string statusJson() {
       h = d.h;
     }
     o << "{\"key\":\"" << d.key << "\",\"name\":\"" << d.name << "\",\"kind\":\"" << d.kind
-      << "\",\"prefix\":\"" << d.prefix << "\",\"bound\":" << (d.bound ? "true" : "false")
+      << "\",\"prefix\":\"" << d.prefix << "\",\"text\":" << (d.text || d.lam ? "true" : "false") << ",\"bound\":" << (d.bound ? "true" : "false")
       << ",\"drawing\":" << ((t - d.lastDraw) < 2.0 ? "true" : "false") << ",\"w\":" << w << ",\"h\":" << h
       << ",\"captures\":" << d.captures.load() << ",\"readMs\":" << (int)(d.readMs * 100) / 100.0 << "}";
   }
@@ -495,6 +738,21 @@ static void startHttp() {
     res.set_header("Cache-Control", "no-store");
     res.set_header("Access-Control-Expose-Headers", "X-Seq");
     res.set_content(d->jpg, "image/jpeg");
+  });
+
+  // long-poll for add-on text screens (JSON, same seq logic as /frame)
+  svr.Get(R"(/text/([a-z0-9_]+))", [](const httplib::Request &req, httplib::Response &res) {
+    Device *d = findDev(req.matches[1]);
+    if (!d || !(d->text || d->lam)) { res.status = 404; return; }
+    uint64_t after = req.has_param("after") ? std::stoull(req.get_param_value("after")) : 0;
+    d->lastWanted = nowSec();
+    std::unique_lock<std::mutex> l(d->jpgMx);
+    d->jpgCv.wait_for(l, std::chrono::milliseconds(1500), [&] { return d->seq > after && !d->jpg.empty(); });
+    if (d->seq <= after || d->jpg.empty()) { res.status = 204; return; }
+    res.set_header("X-Seq", std::to_string(d->seq));
+    res.set_header("Cache-Control", "no-store");
+    res.set_header("Access-Control-Expose-Headers", "X-Seq");
+    res.set_content(d->jpg, "application/json");
   });
 
   // /api/cmd?c=sim/GPS/g1000n1_ent&m=once|begin|end&n=1
@@ -599,6 +857,7 @@ PLUGIN_API void XPluginStop(void) {
 
 PLUGIN_API int XPluginEnable(void) {
   for (auto &d : gDev) {
+    if (d.text) continue;
     XPLMCustomizeAvionics_t p;
     memset(&p, 0, sizeof p);
     p.structSize = sizeof p;

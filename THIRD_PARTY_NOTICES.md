@@ -1,7 +1,7 @@
 # Third-party notices
 
 XPGlassPad includes the following third-party code. Their licenses apply to those
-files only; everything else in this repository is licensed under CC BY-NC-SA 4.0 (see LICENSE).
+files only; everything else in this repository is licensed under CC BY 4.0 (see LICENSE).
 
 ## cpp-httplib 0.18.3 — `third_party/httplib.h`
 https://github.com/yhirose/cpp-httplib
@@ -34,7 +34,13 @@ MIT / public-domain license); MIT text as above.
 API (function names, signatures, enum values) as documented at
 https://developer.x-plane.com/sdk/. X-Plane is a trademark of Laminar Research.
 
+## B612 Mono font (web/b612mono.woff2)
+Copyright 2012 The B612 Project Authors (https://github.com/polarsys/b612).
+Licensed under the SIL Open Font License, Version 1.1 (https://openfontlicense.org).
+Used to draw add-on MCDU text (ToLiss).
+
 ## Trademarks
 Garmin, G1000, GNS 430 and GNS 530 are trademarks of Garmin Ltd. or its subsidiaries.
+Airbus and Boeing are trademarks of their respective owners; ToLiss is a trademark of its owner.
 XPGlassPad is an independent fan project and is not affiliated with or endorsed by
-Garmin or Laminar Research. The bezels are drawn from scratch and carry no Garmin logos.
+Garmin, Laminar Research, Airbus, Boeing or ToLiss. The bezels are drawn from scratch and carry no Garmin logos.

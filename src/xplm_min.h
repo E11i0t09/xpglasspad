@@ -23,7 +23,10 @@ typedef int   XPLMDeviceID;
 enum {
   xplm_device_GNS430_1 = 0, xplm_device_GNS430_2 = 1,
   xplm_device_GNS530_1 = 2, xplm_device_GNS530_2 = 3,
+  xplm_device_CDU739_1 = 4, xplm_device_CDU739_2 = 5,
   xplm_device_G1000_PFD_1 = 6, xplm_device_G1000_MFD = 7, xplm_device_G1000_PFD_2 = 8,
+  xplm_device_CDU815_1 = 9, xplm_device_CDU815_2 = 10,
+  xplm_device_MCDU_1 = 18, xplm_device_MCDU_2 = 19,
 };
 
 typedef int  XPLMMouseStatus;
@@ -69,6 +72,11 @@ XPLM_API void  XPLMRegisterFlightLoopCallback(XPLMFlightLoop_f inFlightLoop, flo
 XPLM_API void  XPLMUnregisterFlightLoopCallback(XPLMFlightLoop_f inFlightLoop, void *inRefcon);
 
 XPLM_API XPLMDataRef XPLMFindDataRef(const char *inDataRefName);
+XPLM_API int   XPLMGetDatai(XPLMDataRef inDataRef);
+XPLM_API float XPLMGetDataf(XPLMDataRef inDataRef);
+XPLM_API int   XPLMGetDataRefTypes(XPLMDataRef inDataRef);
+XPLM_API int   XPLMGetDatavi(XPLMDataRef inDataRef, int *outValues, int inOffset, int inMax);
+XPLM_API int   XPLMGetDatavf(XPLMDataRef inDataRef, float *outValues, int inOffset, int inMax);
 XPLM_API int   XPLMGetDatab(XPLMDataRef inDataRef, void *outValue, int inOffset, int inMaxBytes);
 XPLM_API float XPLMGetElapsedTime(void);
 

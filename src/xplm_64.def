@@ -8,6 +8,11 @@ EXPORTS
   XPLMFindCommand
   XPLMFindDataRef
   XPLMGetDatab
+  XPLMGetDataRefTypes
+  XPLMGetDataf
+  XPLMGetDatai
+  XPLMGetDatavi
+  XPLMGetDatavf
   XPLMGetElapsedTime
   XPLMGetMyID
   XPLMGetNthAircraftModel

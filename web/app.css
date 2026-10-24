@@ -38,6 +38,12 @@ html, body {
     inset 3px 0 4px rgba(255,255,255,.025),
     inset -3px 0 6px rgba(0,0,0,.35);
 }
+/* fine, slightly grainy plastic: dark and light specks, only on the bezel body */
+.bz::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='3' numOctaves='1' seed='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -2.4 1.45'/></filter><rect width='100%' height='100%' filter='url(%23g)'/></svg>");
+  opacity: .07;
+}
 /* fingerprints / smudges: very faint, only visible in the light */
 .bz::after {
   content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
@@ -58,6 +64,11 @@ html, body {
   box-shadow: inset 0 0 0 2px #050505;
 }
 .screen img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; display: block; }
+.screen canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: none; image-rendering: pixelated; image-rendering: crisp-edges; }
+.screen.pixel canvas { display: block; }
+.screen.pixel img { display: none; }
+/* one or two instruments inside #bezel */
+.panel { position: absolute; transform-origin: 0 0; }
 .screen .glass {
   position: absolute; inset: 0; pointer-events: none;
   background: linear-gradient(155deg, rgba(255,255,255,.06), rgba(255,255,255,0) 35%, rgba(255,255,255,0) 70%, rgba(255,255,255,.025));
@@ -232,35 +243,35 @@ html, body {
 #toast.hidden { opacity: 0; pointer-events: none; }
 
 /* ============================================================ GNS 430/530 (matte black Garmin look) */
-#bezel[data-kind^="gns"] { --ink: #eeeeea; --gfont: "Segoe UI", "Myriad Pro", -apple-system, "Helvetica Neue", Arial, sans-serif; }
-#bezel[data-kind^="gns"] .bz {
+.panel[data-kind^="gns"] { --ink: #eeeeea; --gfont: "Segoe UI", "Myriad Pro", -apple-system, "Helvetica Neue", Arial, sans-serif; }
+.panel[data-kind^="gns"] .bz {
   background:
     url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"),
     radial-gradient(120% 90% at 30% 8%, rgba(255,255,255,.035), rgba(0,0,0,0) 60%),
     linear-gradient(180deg, #19191b, #131315 35%, #0f0f10);
   border-radius: 14px;
 }
-#bezel[data-kind^="gns"] .lbl { font-family: var(--gfont); font-weight: 500; letter-spacing: .2px; }
-#bezel[data-kind^="gns"] .lbl.md { font-size: 17px; }
-#bezel[data-kind^="gns"] .recess { border-radius: 4px; background: #0a0a0b;
+.panel[data-kind^="gns"] .lbl { font-family: var(--gfont); font-weight: 500; letter-spacing: .2px; }
+.panel[data-kind^="gns"] .lbl.md { font-size: 17px; }
+.panel[data-kind^="gns"] .recess { border-radius: 4px; background: #0a0a0b;
   box-shadow: inset 0 0 0 1.5px #232325, inset 0 3px 6px rgba(0,0,0,.9); }
 
-#bezel[data-kind^="gns"] .key {
+.panel[data-kind^="gns"] .key {
   border-radius: 9px; border: 1px solid #000;
   background: radial-gradient(130% 100% at 50% 15%, #2a2a2d, #18181a 55%, #111112);
   box-shadow: 0 3px 4px rgba(0,0,0,.8), 0 1px 1px rgba(0,0,0,.9),
               inset 0 1px 0 rgba(255,255,255,.13), inset 0 -3px 4px rgba(0,0,0,.55);
   color: #f2f2ee; font-family: var(--gfont); font-weight: 500; font-size: 18px; letter-spacing: .2px;
 }
-#bezel[data-kind^="gns"] .key.down {
+.panel[data-kind^="gns"] .key.down {
   background: radial-gradient(130% 100% at 50% 15%, #1d1d20, #121214 60%);
   box-shadow: 0 1px 1px rgba(0,0,0,.9), inset 0 2px 4px rgba(0,0,0,.7);
 }
-#bezel[data-kind^="gns"] .pocket {
+.panel[data-kind^="gns"] .pocket {
   border-radius: 13px; background: #0b0b0c;
   box-shadow: inset 0 0 0 1.5px #2b2b2e, inset 0 3px 6px rgba(0,0,0,.85), 0 1px 0 rgba(255,255,255,.04);
 }
-#bezel[data-kind^="gns"] .strip {
+.panel[data-kind^="gns"] .strip {
   border-radius: 6px; background: linear-gradient(180deg, #161618, #111113);
   box-shadow: inset 0 0 0 1.5px #27272a, inset 0 1px 0 rgba(255,255,255,.06), 0 2px 4px rgba(0,0,0,.6);
 }
@@ -287,3 +298,288 @@ html, body {
 .cap.gnsk { filter: drop-shadow(0 7px 6px rgba(0,0,0,.9)) drop-shadow(0 0 1px #000); }
 .face.gtxt { width: 100%; height: 100%; background: none; box-shadow: none; font-family: var(--gfont); font-weight: 500; color: #eee; }
 .knob.active .gnsk.on { filter: brightness(1.25) drop-shadow(0 5px 5px rgba(0,0,0,.85)); }
+
+/* ============================================================ FMS units: Boeing CDU + Airbus MCDU (Laminar built-in) */
+.panel[data-kind="cdu"], .panel[data-kind="mcdu"] {
+  --ink: #ececea; --ffont: "DIN Alternate", "Bahnschrift", "Roboto Condensed", "Arial Narrow", -apple-system, Arial, sans-serif;
+}
+.panel[data-kind="cdu"] .bz, .panel[data-kind="mcdu"] .bz {
+  border-radius: 12px;
+  background:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .06 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"),
+    radial-gradient(120% 80% at 30% 8%, rgba(255,255,255,.06), rgba(0,0,0,0) 60%),
+    linear-gradient(180deg, #4b4d51, #404246 40%, #37393c);
+}
+.panel[data-kind="mcdu"] .bz { background:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .06 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"),
+    radial-gradient(120% 80% at 30% 8%, rgba(255,255,255,.06), rgba(0,0,0,0) 60%),
+    linear-gradient(180deg, #55585c, #4a4d51 40%, #414447); }
+.panel[data-kind="cdu"] .lbl, .panel[data-kind="mcdu"] .lbl { font-family: var(--ffont); }
+.panel[data-kind="cdu"] .recess, .panel[data-kind="mcdu"] .recess { background: #0b0b0c; border-radius: 6px;
+  box-shadow: inset 0 0 0 2px #2a2b2e, inset 0 4px 8px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.08); }
+.screen.contain img { object-fit: contain; }
+
+.panel[data-kind="cdu"] .key, .panel[data-kind="mcdu"] .key {
+  border-radius: 7px; border: 1px solid #070708;
+  background: radial-gradient(130% 100% at 50% 12%, #2c2d30, #19191b 55%, #111113);
+  box-shadow: 0 4px 4px rgba(0,0,0,.7), 0 1px 1px rgba(0,0,0,.9), inset 0 1px 0 rgba(255,255,255,.14), inset 0 -3px 4px rgba(0,0,0,.55);
+  color: #f0f0ec; font-family: var(--ffont); font-weight: 700; letter-spacing: .3px;
+}
+.panel[data-kind="cdu"] .key.down, .panel[data-kind="mcdu"] .key.down {
+  background: radial-gradient(130% 100% at 50% 12%, #202123, #121214 60%);
+  box-shadow: 0 1px 1px rgba(0,0,0,.9), inset 0 2px 4px rgba(0,0,0,.7);
+}
+.key.fn { font-size: 14px; line-height: 1.05; }
+.key.fn.small { font-size: 13px; }
+.key.fn.arrow { font-size: 26px; font-weight: 400; }
+.key.alpha { font-size: 24px; }
+.key.alpha.small { font-size: 15px; line-height: 1.05; }
+.key.round { border-radius: 50% !important; font-size: 24px; }
+.key.lsk { border-radius: 5px; }
+.key.lsk .dash { display: block; width: 30px; height: 4px; border-radius: 2px; background: #e9e9e6; opacity: .9; }
+.key .boxed { display: inline-block; border: 2px solid currentColor; padding: 0 5px; line-height: 1.15; font-weight: 700; }
+.lsktick { position: absolute; height: 2px; margin-top: -1px; background: var(--ink); opacity: .55; }
+.fmspanel { position: absolute; border-radius: 8px;
+  box-shadow: inset 0 0 0 1.5px rgba(0,0,0,.45), inset 0 1px 3px rgba(0,0,0,.4), 0 1px 0 rgba(255,255,255,.06); }
+.execbar { position: absolute; width: 60px; height: 9px; margin-left: -30px; border-radius: 2px; background: #121212;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.08); }
+.oval { position: absolute; width: 58px; height: 22px; transform: translate(-50%, -50%); border-radius: 11px;
+  background: radial-gradient(circle at 40% 35%, #3a3b3d, #141516 70%); box-shadow: inset 0 0 0 1px #000, 0 1px 0 rgba(255,255,255,.08); }
+.cell.lamp { background: radial-gradient(circle at 38% 32%, #f2f2f2, #9a9b9d 55%, #555 100%); }
+.slotlight { position: absolute; width: 22px; transform: translateX(-50%); border-radius: 6px; background: #121314;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,.95), 0 1px 0 rgba(255,255,255,.06); display: flex; align-items: center; justify-content: center; }
+.slotlight span { writing-mode: vertical-rl; transform: rotate(180deg); font: 600 9px var(--ffont, Arial); color: #3c3d40; letter-spacing: 1px; }
+
+/* ============================================================ Airbus MCDU – measured from a real A320 unit */
+.panel[data-kind="mcdu"] { --ffont: "Helvetica Neue", "Arial Narrow", Arial, sans-serif; }
+.panel[data-kind="mcdu"] .bz { border-radius: 6px; background:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"),
+    radial-gradient(110% 60% at 50% 0%, rgba(255,255,255,.05), rgba(255,255,255,0) 70%),
+    linear-gradient(180deg, #5f686f, #5a636a 50%, #555e65);
+  box-shadow: 0 30px 60px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.18), inset 0 -2px 3px rgba(0,0,0,.35),
+    inset 1px 0 0 rgba(255,255,255,.08), inset -1px 0 0 rgba(0,0,0,.25); }
+.panel[data-kind="mcdu"] .bz::before { opacity: .09; }
+.deco { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }
+.deco .rim { fill: rgba(255,255,255,.015); stroke: rgba(0,0,0,.38); stroke-width: 2.5;
+  filter: drop-shadow(0 -1.2px 0 rgba(255,255,255,.16)) drop-shadow(0 1px 0 rgba(255,255,255,.06)); }
+.deco .rail { fill: none; stroke: rgba(0,0,0,.28); stroke-width: 1.5; filter: drop-shadow(1px 0 0 rgba(255,255,255,.12)); }
+.hole { position: absolute; width: 16px; height: 16px; transform: translate(-50%, -50%); border-radius: 50%;
+  background: radial-gradient(circle at 50% 60%, #e9e2d6, #c9c1b3 60%, #6d6a64 100%); box-shadow: inset 0 2px 2px rgba(0,0,0,.6), 0 1px 0 rgba(255,255,255,.18); }
+.ledge { position: absolute; height: 11px; border-radius: 1px; background: linear-gradient(180deg, #697279, #5d666d);
+  box-shadow: 0 -1px 0 rgba(255,255,255,.14), 0 2px 2px rgba(0,0,0,.35); }
+.mbezel { position: absolute; border-radius: 6px; background: linear-gradient(160deg, #5e676e, #4f585e);
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.12), inset 0 -2px 2px rgba(0,0,0,.3), 0 -1px 0 rgba(0,0,0,.35); }
+.panel[data-kind="mcdu"] .screen { border-radius: 4px 4px 2px 2px; box-shadow: 0 0 0 2px #2e3438, inset 0 3px 8px rgba(0,0,0,.9); background: #0e0e12; }
+.panel[data-kind="mcdu"] .lsktick { height: 4px; margin-top: -2px; background: #f2f2ee; opacity: .92; border-radius: 1px; }
+.panel[data-kind="mcdu"] .oval { width: 83px; height: 28px; border-radius: 14px; background: #070607;
+  box-shadow: inset 0 3px 4px rgba(0,0,0,.95), 0 1px 0 rgba(255,255,255,.2), 0 -1px 0 rgba(0,0,0,.4); }
+/* matt black keys, slightly dished, white lettering */
+.panel[data-kind="mcdu"] .key { border-radius: 7px; border: 1px solid #0b0b0c;
+  background: radial-gradient(70% 60% at 50% 62%, #2a2b2e, #1d1e20 70%, #151517);
+  box-shadow: 0 3px 3px rgba(0,0,0,.55), 0 1px 1px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.13), inset 0 -2px 2px rgba(0,0,0,.5);
+  color: #f4f4f0; font-family: var(--ffont); font-weight: 700; font-stretch: condensed; letter-spacing: -.2px; }
+.panel[data-kind="mcdu"] .key.down { background: radial-gradient(70% 60% at 50% 62%, #222326, #161618 70%); box-shadow: 0 1px 1px rgba(0,0,0,.7), inset 0 2px 3px rgba(0,0,0,.6); }
+.panel[data-kind="mcdu"] .key.fn { font-size: 17px; line-height: .98; }
+.panel[data-kind="mcdu"] .key.fn.tiny { font-size: 12px; border-radius: 5px; align-items: flex-end; padding-bottom: 6px; }
+.panel[data-kind="mcdu"] .key.alpha { font-size: 25px; border-radius: 9px; }
+.panel[data-kind="mcdu"] .key.alpha.small { font-size: 19px; line-height: .9; }
+.panel[data-kind="mcdu"] .key.alpha small { font-size: 10px; }
+.panel[data-kind="mcdu"] .key.num { font-size: 25px; }
+.panel[data-kind="mcdu"] .key .boxed { border-width: 2px; padding: 1px 6px; line-height: 1.05; }
+.panel[data-kind="mcdu"] .key .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: currentColor; margin-top: 14px; }
+.panel[data-kind="mcdu"] .key .pm { font-size: 22px; } .panel[data-kind="mcdu"] .key .pm u { text-decoration: none; display: inline-block; width: 9px; height: 2px; background: currentColor; margin-left: -2px; vertical-align: -6px; }
+.panel[data-kind="mcdu"] .key.lsk { border-radius: 6px; }
+.panel[data-kind="mcdu"] .key.lsk .dash { width: 18px; height: 3px; background: #f2f2ee; }
+.arr { position: relative; display: block; width: 34px; height: 3px; background: currentColor; }
+.arr::after { content: ""; position: absolute; top: 50%; border: 6px solid transparent; transform: translateY(-50%); }
+.arr.l::after { left: -9px; border-right: 10px solid currentColor; border-left: 0; }
+.arr.r::after { right: -9px; border-left: 10px solid currentColor; border-right: 0; }
+.arr.u, .arr.d { width: 3px; height: 26px; }
+.arr.u::after, .arr.d::after { left: 50%; top: auto; transform: translateX(-50%); }
+.arr.u::after { top: -9px; border-bottom: 10px solid currentColor; border-top: 0; }
+.arr.d::after { bottom: -9px; border-top: 10px solid currentColor; border-bottom: 0; }
+.panel[data-kind="mcdu"] .slotlight { width: 29px; border-radius: 2px; background: #0b0a08;
+  box-shadow: inset 0 3px 5px rgba(0,0,0,.95), 0 1px 0 rgba(255,255,255,.18), 0 -1px 0 rgba(0,0,0,.35); }
+.panel[data-kind="mcdu"] .screw { width: 20px; height: 20px; background: radial-gradient(circle at 35% 30%, #e4e4e2, #a9aaa8 55%, #6c6d6c);
+  box-shadow: 0 1px 1px rgba(0,0,0,.5), inset 0 0 0 1px rgba(0,0,0,.25); }
+.panel[data-kind="mcdu"] .screw::after { left: 5px; right: 5px; height: 2.5px; margin-top: -1.25px; background: #3b3c3c;
+  box-shadow: none; transform: rotate(var(--r, 30deg)); }
+.panel[data-kind="mcdu"] .screw::before { content: ""; position: absolute; top: 5px; bottom: 5px; left: 50%; width: 2.5px; margin-left: -1.25px;
+  background: #3b3c3c; transform: rotate(var(--r, 30deg)); }
+
+/* ---- FMS screens: stretch the sim image so its 14 text rows always line up with the line select keys */
+.panel[data-kind="mcdu"] .screen img, .panel[data-kind="cdu"] .screen img { object-fit: fill; }
+
+/* ---- MCDU relief: stronger shadows + specular edges */
+.panel[data-kind="mcdu"] .bz { box-shadow: 0 30px 60px rgba(0,0,0,.6), inset 0 2px 0 rgba(255,255,255,.28), inset 2px 0 0 rgba(255,255,255,.12),
+  inset 0 -3px 0 rgba(0,0,0,.45), inset -2px 0 0 rgba(0,0,0,.3), inset 0 -10px 18px rgba(0,0,0,.18); }
+.deco .rim { fill: rgba(255,255,255,.03); stroke: rgba(10,12,14,.55); stroke-width: 3;
+  filter: drop-shadow(0 -1.5px 0 rgba(255,255,255,.32)) drop-shadow(-1px 0 0 rgba(255,255,255,.14)) drop-shadow(0 3px 2px rgba(0,0,0,.35)); }
+.deco .rail { stroke: rgba(0,0,0,.45); stroke-width: 2; filter: drop-shadow(1.5px 0 0 rgba(255,255,255,.22)); }
+.ledge { height: 12px; border-radius: 2px; background: linear-gradient(180deg, #7b858c 0, #6a737a 30%, #5b646b 100%);
+  box-shadow: 0 -1px 0 rgba(255,255,255,.35), inset 0 1px 0 rgba(255,255,255,.25), 0 3px 3px rgba(0,0,0,.55), 0 1px 0 rgba(0,0,0,.6); }
+.mbezel { background: linear-gradient(165deg, #6a737a, #586167 40%, #4c555b);
+  box-shadow: 0 -1px 0 rgba(255,255,255,.3), -1px 0 0 rgba(255,255,255,.12), 0 4px 6px rgba(0,0,0,.45), 0 1px 0 rgba(0,0,0,.6),
+    inset 0 2px 0 rgba(255,255,255,.22), inset 0 -2px 3px rgba(0,0,0,.35); }
+.panel[data-kind="mcdu"] .screen { box-shadow: 0 0 0 2px #262b2f, 0 1px 0 2px rgba(255,255,255,.12), inset 0 4px 10px rgba(0,0,0,.95); }
+.panel[data-kind="mcdu"] .oval, .panel[data-kind="mcdu"] .slotlight { box-shadow: inset 0 4px 6px rgba(0,0,0,1), inset 0 -1px 0 rgba(255,255,255,.06),
+  0 1.5px 0 rgba(255,255,255,.32), 0 -1.5px 0 rgba(0,0,0,.5); }
+.panel[data-kind="mcdu"] .key {
+  background: radial-gradient(60% 50% at 50% 60%, #2b2c2f, #1c1d1f 65%, #131315),
+    linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,0) 30%);
+  box-shadow: 0 6px 6px rgba(0,0,0,.55), 0 2px 1px rgba(0,0,0,.75), 0 0 0 1px rgba(0,0,0,.6),
+    inset 0 1.5px 0 rgba(255,255,255,.28), inset 1px 0 0 rgba(255,255,255,.08), inset -1px 0 0 rgba(0,0,0,.4), inset 0 -3px 3px rgba(0,0,0,.55); }
+.panel[data-kind="mcdu"] .key::after { /* soft specular sheen in the dish */
+  background: radial-gradient(closest-side, rgba(255,255,255,calc(var(--pol,.05) + .05)), transparent); top: 32%; height: 45%; width: 75%; }
+.panel[data-kind="mcdu"] .key.down { transform: translate(-50%, calc(-50% + 3px));
+  box-shadow: 0 1px 1px rgba(0,0,0,.8), 0 0 0 1px rgba(0,0,0,.6), inset 0 2px 4px rgba(0,0,0,.7); }
+.panel[data-kind="mcdu"] .screw { box-shadow: 0 2px 2px rgba(0,0,0,.55), inset 0 0 0 1px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.6); }
+.panel[data-kind="mcdu"] .hole { box-shadow: inset 0 3px 3px rgba(0,0,0,.7), 0 1px 0 rgba(255,255,255,.3); }
+
+/* ---- v3: raised plateau + display bezel sloping down to the screen (light from above) */
+.deco .pl-wall { fill: #3c4348;  }
+.deco .pl-top { stroke: rgba(255,255,255,.10); stroke-width: 1;  }
+.mbezel { background: none; border-radius: 3px; border-style: solid; border-width: 25px 33px 31px 32px;
+  border-color: #464e54 #555d63 #747d84 #51595f;
+  box-shadow: 0 -1.5px 0 rgba(255,255,255,.32), 0 1px 0 rgba(0,0,0,.35), inset 0 0 0 1px rgba(0,0,0,.25); }
+.mbezel::after { content: ""; position: absolute; inset: -25px -33px -31px -32px; border-radius: 3px; pointer-events: none;
+  background: linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,0) 20%, rgba(255,255,255,0) 80%, rgba(255,255,255,.06)); }
+.panel[data-kind="mcdu"] .screen { border-radius: 2px; box-shadow: 0 0 0 1.5px #1d2226, 0 2px 0 1.5px rgba(255,255,255,.08), inset 0 5px 10px rgba(0,0,0,.95); }
+
+/* ---- v4: front plate over flange, grain, grease, deeper relief */
+.panel[data-kind="mcdu"] .bz { background: linear-gradient(180deg, #4e565c, #454c52); }
+.panel[data-kind="mcdu"] .bz::before { opacity: 0; }
+.deco .fp {  stroke: rgba(255,255,255,.10); stroke-width: 1; }
+.deco .pl-wall { fill: #353b40;  }
+.deco .pl-top { stroke: rgba(255,255,255,.12); stroke-width: 1;  }
+.grain { position: absolute; pointer-events: none; opacity: .09;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='1.6' numOctaves='2' seed='11' stitchTiles='stitch'/><feColorMatrix values='1.5 0 0 0 -.25  1.5 0 0 0 -.25  1.5 0 0 0 -.25  0 0 0 0 1'/></filter><rect width='100%' height='100%' filter='url(%23g)'/></svg>"); }
+.hole { width: 17px; height: 17px; background: radial-gradient(circle at 50% 62%, #050505 55%, #1b1d1f 75%, #2a2f33 100%);
+  box-shadow: inset 0 2px 2px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.22), 0 -1px 0 rgba(0,0,0,.3); }
+.ledge { height: 13px; background: linear-gradient(180deg, #858f96 0, #6f787f 25%, #5a6268 100%);
+  box-shadow: 0 -1.5px 0 rgba(255,255,255,.42), 0 4px 4px rgba(0,0,0,.6), 0 1px 0 rgba(0,0,0,.7); }
+.mbezel { border-color: #3f464c #50585e #7a838a #4c545a;
+  box-shadow: 0 -2px 0 rgba(255,255,255,.36), 0 1.5px 0 rgba(0,0,0,.45), inset 0 0 0 1px rgba(0,0,0,.3); }
+/* keys: deeper dish, specular rim, contact shadow on the plastic */
+.panel[data-kind="mcdu"] .key {
+  background: radial-gradient(55% 45% at 50% 64%, #313236, #1d1e20 62%, #121214 100%),
+    linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,0) 28%);
+  box-shadow: 0 0 7px 3px rgba(0,0,0,.28), 0 7px 7px rgba(0,0,0,.55), 0 2px 1px rgba(0,0,0,.8), 0 0 0 1px rgba(0,0,0,.7),
+    inset 0 2px 0 rgba(255,255,255,.32), inset 1.5px 0 0 rgba(255,255,255,.1), inset -1.5px 0 0 rgba(0,0,0,.45), inset 0 -4px 4px rgba(0,0,0,.6); }
+.panel[data-kind="mcdu"] .key::after { background: radial-gradient(closest-side, rgba(255,255,255,calc(var(--pol,.05) + .09)), transparent); top: 30%; height: 40%; width: 70%; }
+.panel[data-kind="mcdu"] .key.down { box-shadow: 0 0 5px 2px rgba(0,0,0,.25), 0 1px 1px rgba(0,0,0,.8), 0 0 0 1px rgba(0,0,0,.7), inset 0 2px 4px rgba(0,0,0,.7); }
+.panel[data-kind="mcdu"] .screw { box-shadow: 0 0 4px 1px rgba(0,0,0,.35), 0 2px 2px rgba(0,0,0,.55), inset 0 0 0 1px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.6); }
+
+/* ---- v5: even bezel slope (photo: ~21 top/bottom, ~31 sides), BRT/DIM keys */
+.mbezel { border-width: 21px 32px 21px 31px; border-color: #3e454b #4f575d #6d767d #4b5359;
+  box-shadow: 0 -2px 0 rgba(255,255,255,.36), 0 2px 0 rgba(0,0,0,.35), 0 3px 2px rgba(0,0,0,.25), inset 0 0 0 1px rgba(0,0,0,.3); }
+.mbezel::after { inset: -21px -32px -21px -31px; }
+.panel[data-kind="mcdu"] .key.fn.tiny { font-size: 13px; padding: 0; border-radius: 4px; }
+.panel[data-kind="mcdu"] .key.fn.tiny.brt { align-items: flex-start; padding-top: 6px; }
+.panel[data-kind="mcdu"] .key.fn.tiny.dim { align-items: flex-end; padding-bottom: 6px; }
+/* ---- v6: larger, more metallic screws (polished steel, Phillips recess) */
+.panel[data-kind="mcdu"] .screw { width: 25px; height: 25px;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255,255,255,.95) 0, rgba(255,255,255,0) 32%),
+    conic-gradient(from 20deg, #f4f5f5, #8d9092 18%, #e6e8e9 32%, #6f7275 50%, #d9dbdc 66%, #7c7f82 82%, #f4f5f5);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.45), 0 0 5px 1px rgba(0,0,0,.35), 0 2px 3px rgba(0,0,0,.6),
+    inset 0 0 0 1.5px rgba(255,255,255,.25), inset 0 -2px 3px rgba(0,0,0,.35); }
+.panel[data-kind="mcdu"] .screw::after, .panel[data-kind="mcdu"] .screw::before { background: #26282a;
+  box-shadow: 0.5px 0.8px 0 rgba(255,255,255,.55), inset 0 1px 1px rgba(0,0,0,.8); }
+.panel[data-kind="mcdu"] .screw::after { left: 6px; right: 6px; height: 3px; margin-top: -1.5px; }
+.panel[data-kind="mcdu"] .screw::before { top: 6px; bottom: 6px; width: 3px; margin-left: -1.5px; }
+
+/* ============================================================ key lighting / night look
+   --lit = 0..1 from the aircraft's panel/instrument rheostat. The brighter the key lighting,
+   the darker the housing (night), while key legends and bezel lettering glow. */
+.panel { --lit: 0; --hb: calc(1 - var(--lit) * .55); --glow: 255,255,255; }
+.panel[data-kind="mcdu"] { --glow: 255,240,214; --nk: .55; --nc: 10,16,28; }   /* Airbus integral lighting: warm white; night keeps the blue-grey */
+.panel[data-kind^="gns"], .panel[data-kind="g1000"] { --nk: .35; }   /* black bezels: darken less */
+.kdim { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: #000;
+  opacity: calc(var(--lit) * .5); transition: opacity .4s; }
+.panel.lit .key span, .panel.lit .lbl {
+  color: rgb(var(--glow));
+  text-shadow: 0 0 calc(var(--lit) * 2px) rgba(var(--glow), calc(var(--lit) * .95)), 0 0 calc(var(--lit) * 6px) rgba(var(--glow), calc(var(--lit) * .75)),
+    0 0 calc(var(--lit) * 14px) rgba(var(--glow), calc(var(--lit) * .65)), 0 0 calc(var(--lit) * 26px) rgba(var(--glow), calc(var(--lit) * .45));
+  opacity: calc(.75 + var(--lit) * .25); }
+.panel.lit .key .boxed { box-shadow: 0 0 calc(var(--lit) * 4px) rgba(var(--glow), calc(var(--lit) * .8)), 0 0 calc(var(--lit) * 14px) rgba(var(--glow), calc(var(--lit) * .4)), inset 0 0 calc(var(--lit) * 4px) rgba(var(--glow), calc(var(--lit) * .5)); }
+.panel.lit .key svg { filter: drop-shadow(0 0 calc(var(--lit) * 3px) rgba(var(--glow), calc(var(--lit) * .9))) drop-shadow(0 0 calc(var(--lit) * 10px) rgba(var(--glow), calc(var(--lit) * .55))); }
+.panel.lit .key .dash, .panel.lit .key .dot { box-shadow: 0 0 calc(var(--lit) * 4px) rgba(var(--glow), calc(var(--lit) * .9)), 0 0 calc(var(--lit) * 14px) rgba(var(--glow), calc(var(--lit) * .5)); }
+.panel[data-kind="mcdu"].lit .key.alpha, .panel[data-kind="mcdu"].lit .key.num { color: rgb(var(--glow)); }
+
+/* ============================================================ add-on MCDU text screen (ToLiss) */
+@font-face { font-family: "B612 Mono"; src: url("b612mono.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+.ftext { position: absolute; inset: 1.5% 2.5%; display: flex; flex-direction: column; justify-content: space-between;
+  font-family: "B612 Mono", Menlo, monospace; pointer-events: none; }
+.frow { flex: 1; display: grid; grid-template-columns: repeat(24, 1fr); align-items: center; }
+.frow span { text-align: center; font-size: 33px; line-height: 1; white-space: pre; }
+.frow span.sm { font-size: 25px; }
+.ftext .cw { color: #f4f4f4; } .ftext .cb { color: #2fe3ff; } .ftext .cg { color: #36f56a; } .ftext .ca { color: #ffad1f; }
+.ftext .cm { color: #ff5cf2; } .ftext .cy { color: #fff23d; } .ftext .cr { color: #ff3b30; } .ftext .cs, .ftext .cc, .ftext .cL { color: #f4f4f4; }
+.screen:not(.live) .ftext { opacity: 0 !important; }
+
+/* bloom must not be clipped by the key edge */
+.panel.lit .key { overflow: visible; }
+.panel.lit .key::before, .panel.lit .key::after { overflow: hidden; }
+/* the worn-print mask would clip the bloom to the text box -> drop it while lit */
+.panel.lit .key span, .panel.lit .lbl { -webkit-mask-image: none; mask-image: none; }
+
+/* ---- menu key on each unit; the top handle only shows when no unit is displayed */
+body.has-dev #handle { display: none; }
+.key.menukey { font-size: 10px !important; letter-spacing: .5px; border-radius: 4px; }
+.key.menukey span { opacity: .8; }
+/* add-on text screens: no <img>/<canvas> (Safari draws a hairline around an empty img), rows fixed to 1/14 */
+.ftext { inset: 2% 2.5%; display: grid; grid-template-rows: repeat(14, minmax(0, 1fr)); overflow: hidden; }
+.frow { min-height: 0; overflow: visible; }
+.frow span { font-size: 28px; line-height: 1; }
+.frow span.sm { font-size: 21px; }
+.screen, .screen * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; outline: none; }
+
+/* ============================================================ v7: performance + bezel + press feedback
+   Night = ONE overlay layer (no per-element filters). Housing parts sit below it, keys/labels/knobs/screen above.
+   Static layers get their own compositing layer so a new screen frame never re-rasterises blur/glow. */
+.night { position: absolute; inset: 0; border-radius: 14px; pointer-events: none; z-index: 2;
+  background: rgb(var(--nc, 0,0,0)); opacity: calc(var(--lit) * var(--nk, .5)); }
+.panel .key, .panel .knob, .panel .lbl, .panel .screen, .panel .rocker { z-index: 3; }
+.panel .screen { will-change: transform; contain: paint; }
+.panel .deco, .panel .grease, .panel .grain, .panel > svg, .panel .bz, .night { will-change: transform; }
+.panel.lit .key { will-change: transform; }
+
+/* MCDU display bezel: one rounded slope (no mitre lines), light from above */
+.panel[data-kind="mcdu"] .mbezel { border: none !important; border-radius: 13px;
+  background: linear-gradient(180deg, #3d444a 0, #464d53 21px, #50585e 50%, #5d656c calc(100% - 21px), #757e85 100%);
+  box-shadow: 0 -2px 0 rgba(255,255,255,.36), 0 2px 0 rgba(0,0,0,.4), 0 3px 3px rgba(0,0,0,.25),
+    inset 0 2px 1px rgba(0,0,0,.25), inset 2px 0 3px rgba(0,0,0,.12), inset -2px 0 3px rgba(0,0,0,.12); }
+.panel[data-kind="mcdu"] .mbezel::after { inset: 0; border-radius: inherit; }
+.panel[data-kind="mcdu"] .screen, .panel[data-kind="mcdu"] .screen .glass { border-radius: 7px; overflow: hidden; }
+
+/* MENU keys */
+.key.menukey.round { border-radius: 50% !important; font-size: 7px !important; letter-spacing: 0; }
+
+/* press feedback (all units): deeper travel, stays down while held, small ring in the unit's light colour */
+.panel .key.down { transform: translate(-50%, calc(-50% + 4px)) !important;
+  box-shadow: 0 0 0 1.5px rgba(var(--glow), .55), 0 0 6px 1px rgba(var(--glow), .3), inset 0 3px 6px rgba(0,0,0,.75) !important;
+  filter: brightness(.82); transition: none; }
+.knob.pushed .cap { transform: translate(-50%, -50%) scale(.93) !important;
+  box-shadow: 0 0 0 1.5px rgba(var(--glow), .55), 0 0 6px 1px rgba(var(--glow), .3), 0 2px 3px rgba(0,0,0,.8) !important; }
+.panel .key.menukey.round { align-items: center !important; padding: 0 !important; font-size: 6.5px !important; }
+.panel .key.menukey { align-items: center !important; padding: 0 !important; }
+
+/* ---- v8: MCDU display slope with round corners and real depth (no mitre lines, Safari-safe):
+   flat ring = base colour, slope = inset shadows (top in shade, bottom catches light) */
+.panel[data-kind="mcdu"] .mbezel { background: #535b61 !important; border-radius: 14px;
+  box-shadow: 0 -2px 0 rgba(255,255,255,.38), 0 2px 0 rgba(0,0,0,.45), 0 4px 4px rgba(0,0,0,.25),
+    inset 0 22px 14px -8px rgba(0,0,0,.42), inset 0 -22px 14px -8px rgba(255,255,255,.20),
+    inset 30px 0 16px -12px rgba(0,0,0,.16), inset -30px 0 16px -12px rgba(0,0,0,.16) !important; }
+.panel[data-kind="mcdu"] .mbezel::after { display: none; }
+/* Laminar FMS image: keep its real proportions (stretching made the A330 page too wide/flat) */
+.panel[data-kind="mcdu"] .screen img, .panel[data-kind="cdu"] .screen img { object-fit: contain; }
+
+/* Laminar CDU styles: black/red text, reverse video, flashing, underline */
+.ftext .ck { color: #000; } .ftext .cr { color: #ff3b30; }
+.ftext .rv { color: #000 !important; }
+.ftext .rv.cw { background: #f4f4f4; } .ftext .rv.cb { background: #2fe3ff; } .ftext .rv.cg { background: #36f56a; }
+.ftext .rv.ca { background: #ffad1f; } .ftext .rv.cm { background: #ff5cf2; } .ftext .rv.cy { background: #fff23d; } .ftext .rv.cr { background: #ff3b30; }
+.ftext .ul { text-decoration: underline; }
+.ftext .fl { animation: fmsflash 1s steps(1) infinite; }
+@keyframes fmsflash { 50% { opacity: 0; } }

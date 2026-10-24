@@ -9,7 +9,10 @@
  */
 'use strict';
 
-const PREFER = ['pfd1', 'mfd', 'pfd2', 'gns530_1', 'gns430_1', 'gns530_2', 'gns430_2'];
+const PREFER = ['pfd1', 'mfd', 'pfd2', 'gns530_1', 'gns430_1', 'gns530_2', 'gns430_2',
+                'mcdu_1', 'tl_mcdu_1', 'cdu739_1', 'cdu815_1', 'mcdu_2', 'tl_mcdu_2', 'cdu739_2', 'cdu815_2'];
+const isFms = (key) => /^(tl_)?(mcdu|cdu)/.test(key);
+const portrait = () => window.innerHeight > window.innerWidth;
 const DETENT = 20;          // degrees of finger rotation per knob click
 const HOLD_MS = 500;        // key hold threshold for begin/end
 const $ = (s) => document.querySelector(s);
@@ -18,12 +21,16 @@ const $ = (s) => document.querySelector(s);
 const DE = (navigator.language || '').toLowerCase().startsWith('de');
 const T = DE ? {
   noConn: 'Keine Verbindung zu X-Plane', wait: 'Warte auf Bild von X-Plane …', offline: 'nicht verbunden',
-  noDev: 'Das geladene Flugzeug hat keinen G1000 / GNS 430 / GNS 530.', menuHint: 'Oben in der Mitte tippen für das Menü.',
-  sound: 'Klick-Sound', ap: 'AP-Tasten (G1000)', auto: 'Gerät automatisch wählen', menu: 'Menü',
+  noDev: 'Das geladene Flugzeug nutzt kein X-Plane-Standardgerät (G1000, GNS, MCDU/CDU). Add-ons wie ToLiss oder Zibo zeichnen ihr eigenes Gerät – Unterstützung folgt.', menuHint: 'Menü: Taste MENÜ oben links am Gerät (ohne Gerät: oben in der Mitte tippen).',
+  menuKey: 'MENÜ', sound: 'Klick-Sound', ap: 'AP-Tasten (G1000)', auto: 'Gerät automatisch wählen', menu: 'Menü',
+  dual: 'GNS 530 + 430 zusammen', pixel: 'Echte Display-Pixel (GNS)',
+  lightAuto: 'Tastenbeleuchtung aus dem Sim', lightMan: 'Beleuchtung manuell',
 } : {
   noConn: 'No connection to X-Plane', wait: 'Waiting for image from X-Plane …', offline: 'not connected',
-  noDev: 'The loaded aircraft has no G1000 / GNS 430 / GNS 530.', menuHint: 'Tap the bar at the top centre for the menu.',
-  sound: 'Click sound', ap: 'AP keys (G1000)', auto: 'Pick device automatically', menu: 'Menu',
+  noDev: 'The loaded aircraft uses no built-in X-Plane unit (G1000, GNS, MCDU/CDU). Add-ons like ToLiss or Zibo draw their own unit – support is coming.', menuHint: 'Menu: MENU key top left on the unit (no unit shown: tap the top centre).',
+  menuKey: 'MENU', sound: 'Click sound', ap: 'AP keys (G1000)', auto: 'Pick device automatically', menu: 'Menu',
+  dual: 'GNS 530 + 430 together', pixel: 'Real display pixels (GNS)',
+  lightAuto: 'Key lighting from the sim', lightMan: 'Manual lighting',
 };
 
 const opts = loadOpts();
@@ -31,10 +38,14 @@ let status = null;
 let current = null;          // device key shown
 let manualPick = false;
 let lastAcf = null;
+const seen = new Set();   // devices the sim actually draws (bound-but-never-drawn units, e.g. a hidden GNS in an add-on, are ignored)
+// FMS units (Laminar MCDU/CDU, ToLiss MCDU) are still in development – hidden in this release
+const FMS_ENABLED = /[?&]fms=1/.test(location.search);
+const usable = (d) => d.bound && seen.has(d.key) && (FMS_ENABLED || !isFms(d.key));
 
 // ---------------------------------------------------------------- options (per iPad)
 function loadOpts() {
-  let o = { sound: true, ap: true, auto: true };
+  let o = { sound: true, ap: true, auto: true, dual: true, pixel: false, lightAuto: true, lightVal: 0 };
   try { Object.assign(o, JSON.parse(localStorage.getItem('glasspad') || '{}')); } catch (e) {}
   return o;
 }
@@ -254,16 +265,149 @@ function gns430(P) {
   return { w: 1180, h: 506, items };
 }
 
-// ---------------------------------------------------------------- rendering
-let screenEl = null, imgEl = null;
+// ---------------------------------------------------------------- FMS units (Laminar built-in CDU / MCDU)
+// Layouts follow Laminar's own CDU and MCDU (X-Plane FMS / Airbus MCDU manuals); keys use sim/FMS/* (unit 1)
+// and sim/FMS2/* (unit 2), names taken from the default 737-800 and A330 cockpit manipulators.
+const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXY'.split('');
+const BOXED = { E: 1, N: 1, S: 1, W: 1 };   // marked keys, as on the real units
 
-function build(dev) {
-  const root = $('#bezel');
+function fmsCommon(items, P, top, screen) {
+  items.push({ t: 'recess', x: screen.x - 12, y: screen.y - 12, w: screen.w + 24, h: screen.h + 24 });
+  items.push({ t: 'screen', x: screen.x, y: screen.y, w: screen.w, h: screen.h, fit: 'contain' });
+  // 6 line select keys per side, aligned with the CDU's 14-line layout (rows 2,4,…,12)
+  const lh = screen.h / 14;
+  for (let i = 0; i < 6; i++) {
+    const y = screen.y + (2 * i + 2.5) * lh;   // data rows 2,4,…,12
+    items.push({ t: 'lsktick', x: screen.x - 30, y, w: 22 }, { t: 'lsktick', x: screen.x + screen.w + 8, y, w: 22 });
+    items.push({ t: 'key', x: screen.x - 70, y, w: 56, h: 34, html: '<i class="dash"></i>', cmd: P + 'ls_' + (i + 1) + 'l', cls: 'lsk' });
+    items.push({ t: 'key', x: screen.x + screen.w + 70, y, w: 56, h: 34, html: '<i class="dash"></i>', cmd: P + 'ls_' + (i + 1) + 'r', cls: 'lsk' });
+  }
+}
+
+function keypad(items, P, x0, y0, dy, d = 56, dx = 68) {
+  // numeric 3x4 (round keys); y0 = centre of the first row
+  const num = [['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9'], ['.', '0', '+/-']];
+  const ncmd = { '.': 'key_period', '+/-': 'key_minus' };
+  num.forEach((row, r) => row.forEach((k, c) => items.push({ t: 'key', x: x0 + c * dx, y: y0 + r * dy, w: d, h: d,
+    html: k === '.' ? '•' : k, cmd: P + (ncmd[k] || 'key_' + k), cls: 'round' })));
+}
+
+function alphaPad(items, P, x0, y0, dy, last) {
+  ALPHA.forEach((k, i) => items.push({ t: 'key', x: x0 + (i % 5) * 70, y: y0 + Math.floor(i / 5) * dy, w: 58, h: 52,
+    html: BOXED[k] ? `<b class="boxed">${k}</b>` : k, cmd: P + 'key_' + k, cls: 'alpha' }));
+  last.forEach(([html, cmd], i) => items.push({ t: 'key', x: x0 + i * 70, y: y0 + 5 * dy, w: 58, h: 52, html, cmd: P + cmd, cls: 'alpha small' }));
+}
+
+function cduBoeing(P, b737) {
+  const items = [];
+  const K = (x, y, html, cmd, w = 84, h = 46, cls = 'fn') => items.push({ t: 'key', x, y, w, h, html, cmd: P + cmd, cls });
+  [[34, 34], [766, 34], [34, 1030], [766, 1030]].forEach(([x, y], i) => items.push({ t: 'screw', x, y, r: 20 + i * 40 }));
+  fmsCommon(items, P, 0, { x: 150, y: 70, w: 500, h: 420 });
+  // function keys (labels as in the Laminar 737 cockpit; MD-82 uses the generic INDEX / FPLN names)
+  const r1 = 560, r2 = 618, r3 = 678, r4 = 738, cx = [120, 214, 308, 402, 496];
+  K(cx[0], r1, b737 ? 'INIT<br>REF' : 'INDEX', 'index'); K(cx[1], r1, b737 ? 'RTE' : 'FPLN', 'fpln');
+  K(cx[2], r1, 'CLB', 'clb'); K(cx[3], r1, 'CRZ', 'crz'); K(cx[4], r1, 'DES', 'des');
+  items.push({ t: 'lbl', x: 600, y: r1 - 4, html: 'BRT', cls: 'md' });
+  items.push({ t: 'knob', x: 668, y: r1, r: 22, hitR: 34, single: [null, null], plain: true });
+  K(cx[0], r2, 'DIR<br>INTC', 'dir_intc'); K(cx[1], r2, 'LEGS', 'legs'); K(cx[2], r2, 'DEP<br>ARR', 'dep_arr');
+  K(cx[3], r2, 'HOLD', 'hold'); K(cx[4], r2, 'PROG', 'prog');
+  items.push({ t: 'execbar', x: 652, y: r2 - 30 });
+  K(652, r2 + 6, 'EXEC', 'exec');
+  K(cx[0], r3, 'FIX', 'fix'); K(cx[1], r3, 'NAV<br>RAD', 'navrad');
+  K(cx[0], r4, 'PREV<br>PAGE', 'prev'); K(cx[1], r4, 'NEXT<br>PAGE', 'next');
+  items.push({ t: 'panel', x: 72, y: r1 - 32, w: 486, h: 2 * 58 + 6 }, { t: 'panel', x: 72, y: r3 - 30, w: 190, h: 2 * 60 });
+  keypad(items, P, 98, r3 + 2 * 60, 60);
+  alphaPad(items, P, 336, r3, 60, [['Z', 'key_Z'], ['SP', 'key_space'], ['DEL', 'key_delete'], ['/', 'key_slash'], ['CLR', 'key_clear']]);
+  items.push({ t: 'slotlight', x: 30, y: 760, h: 170, txt: 'CALL&nbsp;&nbsp;FAIL' }, { t: 'slotlight', x: 770, y: 760, h: 170, txt: 'MSG&nbsp;&nbsp;OFST' });
+  return { w: 800, h: 1062, items };
+}
+
+// ToLiss names its MCDU commands differently (AirbusFBW/MCDU1LSK1L, …/MCDU1KeyA, …) – read from the ToLiss plugin
+const TLCMD = { key_period: 'KeyDecimal', key_minus: 'KeyPM', key_slash: 'KeySlash', key_space: 'KeySpace', key_overfly: 'KeyOverfly',
+  key_clear: 'KeyClear', dir_intc: 'DirTo', prog: 'Prog', perf: 'Perf', index: 'Init', data: 'Data', fpln: 'Fpln', navrad: 'RadNav',
+  fuel_pred: 'FuelPred', sec_fpln: 'SecFpln', atc_comm: 'ATC', menu: 'Menu', airport: 'Airport', prev: 'SlewLeft', next: 'SlewRight',
+  up: 'SlewUp', down: 'SlewDown', brt: 'KeyBright', dim: 'KeyDim' };
+function tlCmd(c) {
+  let m;
+  if ((m = /^ls_(\d)([lr])$/.exec(c))) return 'LSK' + m[1] + m[2].toUpperCase();
+  if ((m = /^key_([A-Z0-9])$/.exec(c))) return 'Key' + m[1];
+  return TLCMD[c] || c;
+}
+function mcduAirbus(P, tl) {
+  // Airbus A320-family MCDU, measured from a photo of a real unit (housing 693 x 1083 px -> 800 x 1250 units).
+  // Mid-grey housing, matt black keys with white lettering, raised frame around the function keys.
+  const items = [];
+  const cmdOf = (c) => !c ? null : tl ? P + tlCmd(c) : (c === 'brt' || c === 'dim') ? null : P + c;
+  const K = (x, y, html, cmd, w = 76, h = 48, cls = 'fn') => items.push({ t: 'key', x, y, w, h, html, cmd: cmdOf(cmd), cls });
+  // front plate (raised) over a lower outer flange; round cut-outs around the 6 mounting holes,
+  // stepped lower corners and a side step that kinks at AIRPORT height – traced from the photo
+  const FP = 'M0 0 H800 V62 H766 A28 28 0 0 0 766 118 H800 V619 H755 Q745 619 745 629 V688 Q745 698 755 698 H800 V755 C800 775 788 770 788 790 V1135 H748 Q742 1135 742 1141 V1230 Q742 1236 736 1236 ' +
+             'H64 Q58 1236 58 1230 V1141 Q58 1135 52 1135 H12 V790 C12 770 0 775 0 755 V698 H45 Q55 698 55 688 V629 Q55 619 45 619 H0 V118 H34 A28 28 0 0 0 34 62 H0 Z';
+  // raised block around the function keys + AIRPORT/arrow keys (~4 mm proud)
+  const PL = 'M92 584 H676 Q682 584 682 590 V716 Q682 722 676 722 H295 Q289 722 289 728 V918 Q289 924 283 924 H98 Q92 924 92 918 V590 Q92 584 98 584 Z';
+  items.push({ t: 'svg', html:
+    '<defs><linearGradient id="fpg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6a737a"/><stop offset=".55" stop-color="#5f686f"/><stop offset="1" stop-color="#535b62"/></linearGradient>' +
+    '<linearGradient id="plg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#707a81"/><stop offset="1" stop-color="#626b72"/></linearGradient>' +
+    // SVG filters (Safari ignores CSS filter on SVG shapes, so the relief must come from real SVG filters)
+    '<filter id="fpSh" x="-5%" y="-5%" width="110%" height="112%"><feDropShadow dx="0" dy="2" stdDeviation=".6" flood-color="#000" flood-opacity=".55"/><feDropShadow dx="0" dy="4" stdDeviation="2.5" flood-color="#000" flood-opacity=".35"/></filter>' +
+    '<filter id="wallSh" x="-5%" y="-5%" width="110%" height="120%"><feDropShadow dx="0" dy="5" stdDeviation="2.5" flood-color="#000" flood-opacity=".6"/><feDropShadow dx="0" dy="1" stdDeviation=".6" flood-color="#000" flood-opacity=".7"/></filter>' +
+    '<filter id="topHi" x="-5%" y="-5%" width="110%" height="110%"><feDropShadow dx="0" dy="-2" stdDeviation="0" flood-color="#fff" flood-opacity=".34"/><feDropShadow dx="-1" dy="0" stdDeviation="0" flood-color="#fff" flood-opacity=".12"/></filter></defs>' +
+    `<path d="${FP}" fill="url(#fpg)" class="fp" filter="url(#fpSh)"/>` +
+    `<path d="${PL}" transform="translate(0 7)" class="pl-wall" filter="url(#wallSh)"/>` +
+    `<path d="${PL}" fill="url(#plg)" class="pl-top" filter="url(#topHi)"/>` });
+  [[767, 90], [31, 652], [769, 652], [32, 1172], [768, 1172]].forEach(([x, y]) => items.push({ t: 'hole', x, y }));   // top-left hole -> MENU key
+  for (let i = 0; i < 5; i++) items.push({ t: 'oval', x: 194 + i * 103, y: 31 });
+  items.push({ t: 'mbezel', x: 88, y: 77, w: 625, h: 459 });   // slope: 21 top/bottom, 31 sides (photo)
+  // line select keys on ledges + white tick marks
+  // keys point at the data rows 2,4,…,12 of the 14-row MCDU page
+  [0, 1, 2, 3, 4, 5].map((i) => Math.round(98 + (2 * i + 2.5) * 417 / 14)).forEach((y, i) => {
+    items.push({ t: 'ledge', x: 6, y: y + 22, w: 78 }, { t: 'ledge', x: 716, y: y + 22, w: 78 });
+    items.push({ t: 'lsktick', x: 95, y, w: 18 }, { t: 'lsktick', x: 688, y, w: 18 });
+    K(46, y, '<i class="dash"></i>', 'ls_' + (i + 1) + 'l', 51, 35, 'lsk');
+    K(755, y, '<i class="dash"></i>', 'ls_' + (i + 1) + 'r', 51, 35, 'lsk');
+  });
+  items.push({ t: 'slotlight', x: 43, y: 846, h: 228, txt: '' }, { t: 'slotlight', x: 757, y: 846, h: 228, txt: '' });
+  // plastic surface: gaussian-like grain, light fall-off from above, greasy hand-worn sheen
+  items.push({ t: 'grain' }, { t: 'grease', zones: [[400, 1000, 380, 300, .11], [400, 700, 330, 110, .07], [190, 830, 120, 130, .08], [400, 1236, 360, 40, .09], [46, 320, 50, 200, .05], [755, 320, 50, 200, .05]] });
+  items.push({ t: 'screen', x: 119, y: 98, w: 562, h: 417, fit: 'contain' });
+  [[32, 27], [768, 27], [29, 575], [771, 575], [44, 1099], [756, 1099]].forEach(([x, y], i) => items.push({ t: 'screw', x, y, r: 20 + i * 37 }));
+  // function keys
+  const cx = [134, 232, 331, 430, 529, 627], r1 = 613, r2 = 685;
+  K(cx[0], r1, 'DIR', 'dir_intc'); K(cx[1], r1, 'PROG', 'prog'); K(cx[2], r1, 'PERF', 'perf');
+  K(cx[3], r1, 'INIT', 'index'); K(cx[4], r1, 'DATA', 'data'); K(cx[5], r1, '', null);
+  K(cx[0], r2, 'F-PLN', 'fpln'); K(cx[1], r2, 'RAD<br>NAV', 'navrad'); K(cx[2], r2, 'FUEL<br>PRED', 'fuel_pred');
+  K(cx[3], r2, 'SEC<br>F-PLN', 'sec_fpln'); K(cx[4], r2, 'ATC<br>COMM', 'atc_comm'); K(cx[5], r2, 'MCDU<br>MENU', 'menu');
+  K(704, r1 + 2, 'BRT', 'brt', 40, 52, 'fn tiny brt'); K(704, r2, 'DIM', 'dim', 40, 52, 'fn tiny dim');
+  // AIRPORT + slew keys
+  K(cx[0], 756, 'AIR<br>PORT', 'airport'); K(cx[1], 756, '', null);
+  K(cx[0], 827, '<svg width="36" height="20" viewBox="0 0 36 20"><path d="M2 10 L13 3 V8 H34 V12 H13 V17 Z" fill="currentColor"/></svg>', 'prev'); K(cx[1], 827, '<svg width="20" height="34" viewBox="0 0 20 36"><path d="M10 2 L3 13 H8 V34 H12 V13 H17 Z" fill="currentColor"/></svg>', 'up');
+  K(cx[0], 898, '<svg width="36" height="20" viewBox="0 0 36 20"><path d="M34 10 L23 3 V8 H2 V12 H23 V17 Z" fill="currentColor"/></svg>', 'next'); K(cx[1], 898, '<svg width="20" height="34" viewBox="0 0 20 36"><path d="M10 34 L3 23 H8 V2 H12 V23 H17 Z" fill="currentColor"/></svg>', 'down');
+  // numeric pad (round)
+  const num = [['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9'], ['.', '0', '+/-']];
+  const ncmd = { '.': 'key_period', '+/-': 'key_minus' };
+  num.forEach((row, r) => row.forEach((k, c) => K([124, 202, 280][c], 970 + r * 72, k === '.' ? '<b class="dot"></b>' : k === '+/-' ? '<span class="pm">+/<u>&nbsp;</u></span>' : k,
+    ncmd[k] || 'key_' + k, 50, 50, 'round num')));
+  // alpha pad
+  const ax = [360, 439, 517, 596, 674];
+  ALPHA.forEach((k, i) => K(ax[i % 5], 787 + Math.floor(i / 5) * 79, BOXED[k] ? `<b class="boxed">${k}</b>` : k, 'key_' + k, 54, 54, 'alpha'));
+  [['Z', 'key_Z'], ['/', 'key_slash'], ['SP', 'key_space'], ['<small>OVFY</small><br>△', 'key_overfly'], ['CLR', 'key_clear']]
+    .forEach(([h, c], i) => K(ax[i], 1182, h, c, 54, 54, 'alpha' + (i > 1 ? ' small' : '')));
+  return { w: 800, h: 1250, items };
+}
+
+// ---------------------------------------------------------------- rendering
+// native display resolution of the real units (Garmin / SEA spec sheets) for the "real pixels" option
+const NATIVE = { gns530: [320, 234], gns430: [240, 128] };
+
+// builds one instrument into its own .panel element; returns its screen + size
+function buildPanel(dev, root) {
   root.innerHTML = '';
-  delete root.dataset.empty;
   root.dataset.kind = dev.kind;
-  const def = dev.kind === 'g1000' ? g1000(dev.prefix) : dev.kind === 'gns530' ? gns530(dev.prefix) : gns430(dev.prefix);
-  if (dev.kind !== 'g1000') def.items.forEach((it) => { if (it.t === 'knob') it.gns = true; });
+  let screenEl = null, imgEl = null, canvasEl = null, textEl = null;
+  const b737 = /737|b738/i.test((status && (status.acf + ' ' + status.aircraft)) || '');
+  const def = dev.kind === 'g1000' ? g1000(dev.prefix) : dev.kind === 'gns530' ? gns530(dev.prefix)
+    : dev.kind === 'gns430' ? gns430(dev.prefix) : dev.kind === 'mcdu' ? mcduAirbus(dev.prefix, /^tl_/.test(dev.key)) : cduBoeing(dev.prefix, b737);
+  if (dev.kind.startsWith('gns')) def.items.forEach((it) => { if (it.t === 'knob') it.gns = true; });
   root.style.width = def.w + 'px';
   root.style.height = def.h + 'px';
   const bz = el('div', 'bz');
@@ -277,15 +421,30 @@ function build(dev) {
         const e = el('div', it.t); box(e, it.x, it.y, it.w, it.h); root.appendChild(e); break;
       }
       case 'screen': {
-        const e = el('div', 'screen'); box(e, it.x, it.y, it.w, it.h);
-        e.innerHTML = `<img alt=""><div class="wait">${T.wait}</div><div class="glass"></div>`;
-        root.appendChild(e); screenEl = e; imgEl = e.querySelector('img'); break;
+        const e = el('div', 'screen' + (it.fit === 'contain' ? ' contain' : '')); box(e, it.x, it.y, it.w, it.h);
+        e.innerHTML = (dev.text ? '<div class="ftext"></div>' : '<img alt=""><canvas></canvas>') + `<div class="wait">${T.wait}</div><div class="glass"></div>`;
+        root.appendChild(e); screenEl = e; imgEl = e.querySelector('img'); canvasEl = e.querySelector('canvas'); textEl = e.querySelector('.ftext'); if (textEl) buildText(textEl); break;
       }
       case 'screw': {
         const e = el('div', 'screw'); pos(e, it.x, it.y); e.style.setProperty('--r', it.r + 'deg'); root.appendChild(e); break;
       }
       case 'cell': {
-        const e = el('div', 'cell'); pos(e, it.x, it.y); e.style.width = e.style.height = it.r * 2 + 'px'; root.appendChild(e); break;
+        const e = el('div', 'cell ' + (it.cls || '')); pos(e, it.x, it.y); e.style.width = e.style.height = it.r * 2 + 'px'; root.appendChild(e); break;
+      }
+      case 'lsktick': { const e = el('div', 'lsktick'); e.style.cssText = `left:${it.x}px;top:${it.y}px;width:${it.w}px`; root.appendChild(e); break; }
+      case 'panel': { const e = el('div', 'fmspanel'); box(e, it.x, it.y, it.w, it.h); root.appendChild(e); break; }
+      case 'execbar': { const e = el('div', 'execbar'); pos(e, it.x, it.y); root.appendChild(e); break; }
+      case 'oval': { const e = el('div', 'oval'); pos(e, it.x, it.y); root.appendChild(e); break; }
+      case 'grain': { const e = el('div', 'grain'); box(e, 0, 0, def.w, def.h); root.appendChild(e); break; }
+      case 'grease': root.appendChild(grease(def, it.zones, dev.key)); break;
+      case 'hole': { const e = el('div', 'hole'); pos(e, it.x, it.y); root.appendChild(e); break; }
+      case 'ledge': { const e = el('div', 'ledge'); e.style.cssText = `left:${it.x}px;top:${it.y}px;width:${it.w}px`; root.appendChild(e); break; }
+      case 'mbezel': { const e = el('div', 'mbezel'); box(e, it.x, it.y, it.w, it.h); root.appendChild(e); break; }
+      case 'svg': { const e = el('div'); e.innerHTML = `<svg class="deco" width="${def.w}" height="${def.h}">${it.html}</svg>`; root.appendChild(e.firstChild); break; }
+      case 'collar': { const e = el('div', 'collar' + (it.round ? ' round' : '')); pos(e, it.x, it.y); e.style.width = it.w + 'px'; e.style.height = it.h + 'px'; root.appendChild(e); break; }
+      case 'slotlight': {
+        const e = el('div', 'slotlight'); e.style.cssText = `left:${it.x}px;top:${it.y}px;height:${it.h}px`;
+        e.innerHTML = `<span>${it.txt}</span>`; root.appendChild(e); break;
       }
       case 'tick': { const e = el('div', 'tick'); e.style.left = it.x + 'px'; e.style.top = it.y + 'px'; root.appendChild(e); break; }
       case 'lbl': {
@@ -303,8 +462,51 @@ function build(dev) {
       case 'rockerV': case 'rockerH': root.appendChild(makeRocker(it, id)); break;
     }
   }
+  // small MENU key top-left on every unit (opens the settings bar) – styled like the unit's own keys
+  // (MCDU: round key in place of the top-left mounting hole; others: bottom-left corner, away from the iOS status bar)
+  const MK = { g1000: [168, def.h - 26, 54, 22, ''], gns530: [44, def.h - 24, 54, 22, ''], gns430: [44, def.h - 22, 54, 20, ''],
+               mcdu: [33, 90, 30, 30, ' round'], cdu: [110, def.h - 26, 58, 24, ''] }[dev.kind];
+  if (MK) root.appendChild(makeKey({ x: MK[0], y: MK[1], w: MK[2], h: MK[3], html: T.menuKey, cls: 'menukey fn tiny' + MK[4], menu: true }, dev.key + ':menu'));
+  // night: one darkening layer over the housing (keys, labels, knobs and screen sit above it)
+  root.appendChild(el('div', 'night'));
   root.insertBefore(scuffs(def, dev.kind), bz.nextSibling);
+  return { dev, screenEl, imgEl, canvasEl, textEl, w: def.w, h: def.h, el: root };
+}
+
+// lays out one or two instruments: portrait = stacked like in the panel, landscape = side by side.
+// Two GNS units are drawn to the same real-world scale (both are 6.25" wide).
+const GAP = 28;
+function layout(devs) {
+  const root = $('#bezel');
+  root.innerHTML = '';
+  delete root.dataset.empty;
+  root.dataset.kind = devs.length === 1 ? devs[0].kind : 'multi';
+  const built = devs.map((dev) => {
+    const p = el('div', 'panel');
+    root.appendChild(p);
+    const b = buildPanel(dev, p);
+    b.el = p;
+    return b;
+  });
+  // common width for stacked GNS units: scale each to the widest design width
+  const W = Math.max(...built.map((b) => b.w));
+  const vertical = built.length > 1 && portrait();
+  let x = 0, y = 0, totW = 0, totH = 0;
+  for (const b of built) {
+    const k = built.length > 1 ? W / b.w : 1;
+    b.k = k;
+    b.el.dataset.k = k;
+    b.el.style.cssText = `left:${x}px;top:${y}px;width:${b.w}px;height:${b.h}px;transform:scale(${k})`;
+    const bw = b.w * k, bh = b.h * k;
+    if (vertical) { y += bh + GAP; totW = Math.max(totW, bw); totH = y - GAP; }
+    else { x += bw + GAP; totW = x - GAP; totH = Math.max(totH, bh); }
+  }
+  // centre the smaller unit in side-by-side mode
+  if (!vertical && built.length > 1) for (const b of built) b.el.style.top = (totH - b.h * b.k) / 2 + 'px';
+  root.style.width = totW + 'px';
+  root.style.height = totH + 'px';
   fit();
+  return built;
 }
 
 // scratches, rub marks around knobs, worn print – deterministic per instrument type
@@ -316,7 +518,7 @@ function scuffs(def, seed) {
   // finger rub halos around knobs
   for (const it of def.items) if (it.t === 'knob') s += `<circle cx="${it.x + (r() - .5) * 4}" cy="${it.y + 2}" r="${it.r * (it.gns ? 1.3 : 1.55)}" fill="url(#rub)"/>`;
   // fine scratches, mostly near the edges and below the knobs
-  for (let i = 0; i < 46; i++) {
+  for (let i = 0; i < (seed === 'mcdu' ? 0 : 46); i++) {
     const edge = r() < .65;
     let x = r() * W, y = r() * H;
     if (edge) { if (r() < .5) x = r() < .5 ? r() * 230 : W - r() * 230; else y = r() < .5 ? r() * 40 : H - r() * 60; }
@@ -324,7 +526,33 @@ function scuffs(def, seed) {
     s += `<path d="M${x.toFixed(1)} ${y.toFixed(1)} q${(Math.cos(a) * len / 2 + (r() - .5) * 4).toFixed(1)} ${(Math.sin(a) * len / 2 + (r() - .5) * 4).toFixed(1)} ${(Math.cos(a) * len).toFixed(1)} ${(Math.sin(a) * len).toFixed(1)}" stroke="#fff" stroke-opacity="${o.toFixed(3)}" stroke-width="${w.toFixed(2)}" fill="none" stroke-linecap="round"/>`;
   }
   // a few darker dings
-  for (let i = 0; i < 10; i++) s += `<circle cx="${(r() * W).toFixed(1)}" cy="${(r() * H).toFixed(1)}" r="${(.6 + r() * 1.4).toFixed(2)}" fill="#000" fill-opacity="${(.25 + r() * .3).toFixed(2)}"/>`;
+  for (let i = 0; i < (seed === 'mcdu' ? 0 : 10); i++) s += `<circle cx="${(r() * W).toFixed(1)}" cy="${(r() * H).toFixed(1)}" r="${(.6 + r() * 1.4).toFixed(2)}" fill="#000" fill-opacity="${(.25 + r() * .3).toFixed(2)}"/>`;
+  s += '</svg>';
+  const e = el('div'); e.innerHTML = s; return e.firstChild;
+}
+
+// greasy, hand-polished sheen: low-frequency blotches masked to the zones where hands touch the unit
+function grease(def, zones, seed) {
+  const r = rnd('grease' + seed), W = def.w, H = def.h;
+  let m = '';
+  zones.forEach(([x, y, rx, ry, o], i) => { m += `<radialGradient id="gz${i}"><stop offset="0" stop-color="#fff" stop-opacity="${o * 6}"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient><ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" fill="url(#gz${i})"/>`; });
+  let s = `<svg class="deco grease" width="${W}" height="${H}"><defs>` +
+    `<filter id="gzf" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".035 .05" numOctaves="4" seed="${(r() * 99) | 0}"/>` +
+    '<feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  2.2 0 0 0 -1"/></filter>' +
+    `<mask id="gzm">${m}</mask>` +
+    '<linearGradient id="lfall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".07"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".16"/></linearGradient>' +
+    '<radialGradient id="lspot" cx=".35" cy=".18" r=".7"><stop offset="0" stop-color="#fff" stop-opacity=".06"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>' +
+    `<rect width="${W}" height="${H}" fill="url(#lfall)"/><rect width="${W}" height="${H}" fill="url(#lspot)"/>` +
+    `<rect width="${W}" height="${H}" filter="url(#gzf)" mask="url(#gzm)" opacity=".28"/>`;
+  // dings and small chips (no scratch lines): lighter chipped plastic with a dark lower lip
+  for (let i = 0; i < 34; i++) {
+    const edge = r() < .55;
+    let x = r() * W, y = r() * H;
+    if (edge) { if (r() < .5) x = r() < .5 ? 4 + r() * 40 : W - 4 - r() * 40; else y = r() < .4 ? 4 + r() * 30 : H - 6 - r() * 40; }
+    const rx = .7 + r() * 1.8, ry = rx * (.5 + r() * .6), a = (r() * 180) | 0;
+    s += `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${a})"><ellipse cx="0" cy=".7" rx="${rx.toFixed(2)}" ry="${ry.toFixed(2)}" fill="#000" fill-opacity=".35"/>` +
+         `<ellipse rx="${rx.toFixed(2)}" ry="${ry.toFixed(2)}" fill="#c9d0d5" fill-opacity="${(.18 + r() * .25).toFixed(2)}"/></g>`;
+  }
   s += '</svg>';
   const e = el('div'); e.innerHTML = s; return e.firstChild;
 }
@@ -361,9 +589,15 @@ function arcs(it) {
 function makeKey(it, id) {
   const e = el('div', 'key ' + (it.cls || ''));
   box(e, it.x, it.y, it.w, it.h);
-  e.innerHTML = `<span>${it.html}</span>`;
+  e.innerHTML = `<i class="kdim"></i><span>${it.html}</span>`;
   wear(e, id);
   let timer = null, began = false, active = false;
+  if (it.menu) {
+    e.addEventListener('pointerdown', (ev) => { ev.preventDefault(); e.classList.add('down'); click(); });
+    e.addEventListener('pointerup', () => { e.classList.remove('down'); toggleBar(); });
+    e.addEventListener('pointercancel', () => e.classList.remove('down'));
+    return e;
+  }
   e.addEventListener('pointerdown', (ev) => {
     ev.preventDefault(); e.setPointerCapture(ev.pointerId);
     active = true; began = false; e.classList.add('down'); click();
@@ -469,7 +703,7 @@ function makeKnob(it, id) {
   e.addEventListener('pointerdown', (ev) => {
     ev.preventDefault(); e.setPointerCapture(ev.pointerId);
     const [cx, cy] = centre();
-    const scale = currentScale;
+    const scale = currentScale * parseFloat(e.closest('.panel')?.dataset.k || 1);
     const d = Math.hypot(ev.clientX - cx, ev.clientY - cy) / scale;
     const part = dual ? (d > it.ri * 1.12 ? 'outer' : 'inner') : 'outer';
     st = { cx, cy, part, a: Math.atan2(ev.clientY - cy, ev.clientX - cx), acc: 0, moved: 0, t0: performance.now(),
@@ -517,7 +751,7 @@ function makeKnob(it, id) {
     const tap = !st.pan && st.moved < 10 && performance.now() - st.t0 < 450;
     if (tap && it.push) {
       e.classList.add('pushed'); click(); send(it.push);
-      setTimeout(() => e.classList.remove('pushed'), 120);
+      setTimeout(() => e.classList.remove('pushed'), 220);
     }
     if (st.pan) e.classList.remove('pushed');
     e.classList.remove('active'); ring.classList.remove('on'); cap.classList.remove('on');
@@ -549,15 +783,23 @@ function fit() {
   const wrap = $('#bezel-wrap');
   wrap.style.width = w * s + 'px'; wrap.style.height = h * s + 'px';
 }
-window.addEventListener('resize', fit);
+window.addEventListener('resize', () => {
+  fit();
+  if (!status) return;
+  if (opts.auto && !manualPick) { const k = pickAuto(); if (k && k !== current) { show(k); return; } }
+  // two units: re-stack when the tablet is turned (portrait = above each other, landscape = side by side)
+  if (current && current.includes('+') && portrait() !== layoutPortrait) show(current, false, true);
+});
 window.addEventListener('orientationchange', () => setTimeout(fit, 250));
 
 // ---------------------------------------------------------------- frame stream (long-poll)
 let streamGen = 0;
-async function stream(key) {
-  const gen = ++streamGen;
+async function stream(p, gen) {
+  if (p.dev.text) return textStream(p, gen);
+  const key = p.dev.key;
   let seq = 0, frames = 0, t0 = performance.now();
   let lastUrl = null;
+  const native = NATIVE[p.dev.kind];
   while (gen === streamGen) {
     try {
       const r = await fetch(`/frame/${key}?after=${seq}`, { cache: 'no-store' });
@@ -569,46 +811,148 @@ async function stream(key) {
         const pre = new Image(); pre.src = url;
         try { await pre.decode(); } catch (e) {}
         if (gen !== streamGen) { URL.revokeObjectURL(url); break; }
-        imgEl.src = url;
-        if (lastUrl) URL.revokeObjectURL(lastUrl);
-        lastUrl = url;
-        screenEl.classList.add('live');
+        const pixel = !!(opts.pixel && native);
+        p.screenEl.classList.toggle('pixel', pixel);
+        if (pixel) {
+          // reduce to the real unit's resolution, then show it enlarged without smoothing
+          const c = p.canvasEl;
+          if (c.width !== native[0] || c.height !== native[1]) { c.width = native[0]; c.height = native[1]; }
+          const ctx = c.getContext('2d');
+          ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'medium';
+          ctx.drawImage(pre, 0, 0, c.width, c.height);
+          URL.revokeObjectURL(url);
+        } else {
+          p.imgEl.src = url;
+          if (lastUrl) URL.revokeObjectURL(lastUrl);
+          lastUrl = url;
+        }
+        p.screenEl.classList.add('live');
         frames++;
         const now = performance.now();
         if (now - t0 > 2000) { streamFps = frames * 1000 / (now - t0); frames = 0; t0 = now; }
       } else if (r.status === 204) {
         streamFps = 0;
-        screenEl.classList.remove('live');
+        p.screenEl.classList.remove('live');
       } else {
         await sleep(1000);
       }
     } catch (e) {
-      screenEl && screenEl.classList.remove('live');
+      p.screenEl && p.screenEl.classList.remove('live');
       await sleep(1000);
     }
   }
 }
+// add-on MCDU text: 14 rows x 24 cells, colour + small/large per cell (from /text/<key>)
+function buildText(box) {
+  box.innerHTML = '';
+  for (let r = 0; r < 14; r++) {
+    const row = el('div', 'frow');
+    for (let i = 0; i < 24; i++) row.appendChild(el('span'));
+    box.appendChild(row);
+  }
+}
+function renderText(p, j) {
+  const rows = p.textEl.children;
+  j.lines.forEach((ln, r) => {
+    const cells = rows[r].children, t = [...ln.t];
+    for (let i = 0; i < 24; i++) {
+      const f = ln.f ? parseInt(ln.f[i] || '0', 16) : 0;
+      const c = cells[i], ch = t[i] || ' ', cls = 'c' + (ln.c[i] || 'w') + (ln.s[i] === 'S' ? ' sm' : '') + (f & 1 ? ' rv' : '') + (f & 2 ? ' fl' : '') + (f & 4 ? ' ul' : '');
+      if (c.textContent !== ch) c.textContent = ch;
+      if (c.className !== cls) c.className = cls;
+    }
+  });
+  p.textEl.style.opacity = Math.max(.25, Math.min(1, j.br == null ? 1 : j.br));
+}
+async function textStream(p, gen) {
+  let seq = 0;
+  while (gen === streamGen) {
+    try {
+      const r = await fetch(`/text/${p.dev.key}?after=${seq}`, { cache: 'no-store' });
+      if (gen !== streamGen) break;
+      if (r.status === 200) {
+        seq = parseInt(r.headers.get('X-Seq') || '0', 10);
+        renderText(p, await r.json());
+        p.screenEl.classList.add('live');
+      } else if (r.status !== 204) await sleep(1000);
+    } catch (e) { await sleep(1000); }
+  }
+}
+
+// ---------------------------------------------------------------- key lighting / night look
+// level 0..1 of the rheostat that lights this unit's keys in the loaded aircraft (from the cockpit .obj files:
+// C172 G1000 instrument[0], Baron GNS instrument[3], A330 integral instrument_manual[13/14], 737 panel[0..3],
+// MD-82 instrument_manual[0], ToLiss AirbusFBW/MCDUIntegBrightness). No avionics power -> unlit.
+function lightLevel(dev) {
+  if (!opts.lightAuto) return +opts.lightVal || 0;
+  const L = status && status.light;
+  if (!L) return 0;
+  const a = ((status.acf || '') + ' ' + (status.aircraft || '')).toLowerCase();
+  const mx = (...v) => Math.max(0, ...v.map((x) => +x || 0));
+  let v;
+  if (dev.text && L.tlInteg) {
+    if (!L.tlPower) return 0;
+    const u = /2$/.test(dev.key) ? 1 : 0;
+    v = L.tlInteg[Math.min(u, L.tlInteg.length - 1)];
+    if (v > 1.01) v /= 100;
+  } else {
+    if (!L.avionics) return 0;
+    if (/a330|a333/.test(a)) v = mx(L.instMan[13], L.instMan[14]);
+    else if (/737|738|b738/.test(a)) v = mx(L.panel[0], L.panel[3]);
+    else if (/md-?8|md80/.test(a)) v = mx(L.instMan[0]);
+    else if (/baron|b58/.test(a)) v = mx(L.inst[3]);
+    else v = mx(L.inst[0]);
+  }
+  return Math.max(0, Math.min(1, v || 0));
+}
+let panels = [];
+function applyLight() {
+  for (const p of panels) {
+    const v = lightLevel(p.dev);
+    p.el.style.setProperty('--lit', v.toFixed(2));
+    p.el.classList.toggle('lit', v > .02);
+  }
+}
+
 let streamFps = 0;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------------------------------------------------------------- device selection / status
-function show(key, byUser) {
+// a "current" key can be one device ("gns530_1") or two joined with "+" ("gns530_1+gns430_2")
+let layoutPortrait = null;
+function show(key, byUser, force) {
   if (!status) return;
-  const dev = status.devices.find((d) => d.key === key);
-  if (!dev) return;
+  const devs = key.split('+').map((k) => status.devices.find((d) => d.key === k));
+  if (devs.some((d) => !d)) return;
   if (byUser) manualPick = true;
-  if (current === key && $('#bezel').children.length) { renderBar(); return; }
+  if (!force && current === key && $('#bezel').children.length) { renderBar(); return; }
   current = key;
-  build(dev);
-  stream(key);
+  layoutPortrait = portrait();
+  const gen = ++streamGen;
+  panels = layout(devs);
+  document.body.classList.add('has-dev');
+  panels.forEach((p) => stream(p, gen));
+  applyLight();
   renderBar();
 }
 
+// GNS 530 + GNS 430 of the loaded aircraft, if it has both
+function dualKey() {
+  const b = (re) => PREFER.find((k) => re.test(k) && status.devices.some((d) => d.key === k && usable(d)));
+  const a = b(/^gns530/), c = b(/^gns430/);
+  return a && c ? a + '+' + c : null;
+}
+const allBound = (key) => key.split('+').every((k) => status.devices.some((d) => d.key === k && usable(d)));
+
 function pickAuto() {
-  const bound = status.devices.filter((d) => d.bound);
+  const bound = status.devices.filter(usable);
   if (!bound.length) return null;
-  if (current && bound.some((d) => d.key === current) && (manualPick || !opts.auto)) return current;
-  for (const k of PREFER) if (bound.some((d) => d.key === k)) return k;
+  if (current && allBound(current) && (manualPick || !opts.auto)) return current;
+  const dk = dualKey();
+  if (dk && opts.dual) return dk;
+  // portrait -> FMS unit first (CDU/MCDU are upright), landscape -> displays first
+  const order = portrait() ? [...PREFER.filter(isFms), ...PREFER.filter((k) => !isFms(k))] : PREFER;
+  for (const k of order) if (bound.some((d) => d.key === k)) return k;
   return bound[0].key;
 }
 
@@ -616,11 +960,14 @@ function renderBar() {
   $('#acf').textContent = status ? (status.aircraft || '—') : T.offline;
   const box = $('#devs'); box.innerHTML = '';
   if (!status) return;
-  const order = PREFER.map((k) => status.devices.find((d) => d.key === k)).filter(Boolean);
-  for (const d of order) {
-    const b = el('button', (d.key === current ? 'sel ' : '') + (d.bound ? '' : 'off'));
-    b.textContent = d.name;
-    b.addEventListener('click', () => { show(d.key, true); });
+  const order = PREFER.map((k) => status.devices.find((d) => d.key === k)).filter((d) => d && usable(d));
+  const entries = order.map((d) => [d.key, d.name]);
+  const dk = dualKey();
+  if (dk) entries.unshift([dk, 'GNS 530 + 430']);
+  for (const [key, name] of entries) {
+    const b = el('button', key === current ? 'sel' : '');
+    b.textContent = name;
+    b.addEventListener('click', () => { show(key, true); });
     box.appendChild(b);
   }
 }
@@ -629,12 +976,14 @@ async function poll() {
   try {
     const r = await fetch('/api/status', { cache: 'no-store' });
     status = await r.json();
-    if (status.acf !== lastAcf) { lastAcf = status.acf; manualPick = false; if (current) toast(status.aircraft); }
+    if (status.acf !== lastAcf) { lastAcf = status.acf; manualPick = false; seen.clear(); if (current) toast(status.aircraft); }
+    for (const d of status.devices) if (d.bound && d.drawing !== false) seen.add(d.key);
     const k = pickAuto();
     if (k && k !== current) show(k);
     else if (!k) { if (current) { current = null; streamGen++; } noDevice(); }
     renderBar();
-    const d = status.devices.find((x) => x.key === current);
+    applyLight();
+    const d = current && status.devices.find((x) => x.key === current.split('+')[0]);
     $('#stats').textContent = d ? `${d.w}×${d.h} · ${streamFps.toFixed(0)} fps · Readback ${d.readMs} ms${status.pbo ? ' (PBO)' : ''}` : '';
   } catch (e) {
     status = null; renderBar();
@@ -646,6 +995,7 @@ function noDevice() {
   const root = $('#bezel');
   if (root.dataset.empty) return;
   root.dataset.empty = '1';
+  document.body.classList.remove('has-dev');
   root.innerHTML = '';
   root.style.width = '900px'; root.style.height = '300px';
   const m = el('div', 'lbl md'); pos(m, 450, 150);
@@ -660,6 +1010,7 @@ function openBar() {
   $('#bar').classList.remove('hidden');
   clearTimeout(barTimer); barTimer = setTimeout(() => $('#bar').classList.add('hidden'), 6000);
 }
+function toggleBar() { if ($('#bar').classList.contains('hidden')) openBar(); else { clearTimeout(barTimer); $('#bar').classList.add('hidden'); } }
 $('#handle').addEventListener('pointerdown', (e) => { e.preventDefault(); openBar(); });
 $('#bar').addEventListener('pointerdown', () => { clearTimeout(barTimer); barTimer = setTimeout(() => $('#bar').classList.add('hidden'), 6000); });
 
@@ -671,14 +1022,22 @@ function toast(t) {
 
 document.documentElement.lang = DE ? 'de' : 'en';
 $('#handle').setAttribute('aria-label', T.menu);
-for (const [id, key] of [['#opt-sound', 'sound'], ['#opt-ap', 'ap'], ['#opt-auto', 'auto']]) {
+for (const [id, key] of [['#opt-sound', 'sound'], ['#opt-ap', 'ap'], ['#opt-auto', 'auto'], ['#opt-dual', 'dual'], ['#opt-pixel', 'pixel'], ['#opt-light', 'lightAuto']]) {
   $(id).parentElement.lastChild.textContent = ' ' + T[key];
   const c = $(id); c.checked = !!opts[key];
   c.addEventListener('change', () => {
     opts[key] = c.checked; saveOpts();
-    if (key === 'ap' && current) { const k = current; current = null; show(k); }
-    if (key === 'auto') manualPick = false;
+    if (key === 'ap' && current) show(current, false, true);
+    if (key === 'lightAuto') { $('#opt-lightval').disabled = c.checked; applyLight(); }
+    if (key === 'auto' || key === 'dual') { manualPick = false; const k = status && pickAuto(); if (k) show(k, false, true); }
   });
+}
+
+{
+  const r = $('#opt-lightval');
+  r.value = Math.round((+opts.lightVal || 0) * 100); r.disabled = !!opts.lightAuto;
+  r.parentElement.lastChild.textContent = ' ' + T.lightMan;
+  r.addEventListener('input', () => { opts.lightVal = r.value / 100; saveOpts(); applyLight(); });
 }
 
 // keep the iPad awake while the app is open
@@ -689,5 +1048,10 @@ async function keepAwake() {
 document.addEventListener('pointerdown', keepAwake);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
 document.addEventListener('gesturestart', (e) => e.preventDefault());
+document.addEventListener('gesturechange', (e) => e.preventDefault());
+document.addEventListener('touchmove', (e) => { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+let lastTouchEnd = 0;
+document.addEventListener('touchend', (e) => { const n = Date.now(); if (n - lastTouchEnd < 350) e.preventDefault(); lastTouchEnd = n; }, { passive: false });
+document.addEventListener('dblclick', (e) => e.preventDefault());
 
 poll();
