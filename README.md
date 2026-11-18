@@ -28,7 +28,7 @@ Captured from the running app with the live X-Plane 12 screen (default Cessna 17
 
 <img width="4032" height="3024" alt="Hide Bezel on Menu" src="https://github.com/user-attachments/assets/9709e2de-0bbd-466e-be15-5bdb057e1a89" />
 <img width="4032" height="3024" alt="No Bezel on Home Screen" src="https://github.com/user-attachments/assets/e4c0c0ae-970a-4a1a-8680-cdaf4e009b9a" />
-![G1000 Hide Bezel mode response speed on iPad 4](screenshots/G1000_HideBezel.mp4)|
+See screenshots/G1000_HideBezel.mp4 to see the drawing speed on iPad 4.
 
 ## Features
 - **Automatic device detection** – the plugin asks X-Plane which avionics the loaded
