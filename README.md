@@ -11,9 +11,11 @@
 XPGlassPad is a small X-Plane 12 plugin plus a web app. The plugin reads the real
 screen of the built-in avionics straight from the simulator and streams it to your
 tablet. You fly the bezel around it — keys, dual concentric knobs, softkeys — by touch.
+Optionall you can hide the bezel and use the entire screen estate for the G1000 PFD or MFD.
 
-> Tested on Windows / X-Plane 12.4 with iPad and iPhone. macOS and Linux builds are made
+> Tested on Windows / macOS 27 / X-Plane 12.4 with iPad (including 4th Gen) and iPhone. Linux build is made
 > automatically by GitHub Actions but have not been tested yet — feedback very welcome.
+> The Hide Bezel feature was tested for G1000 PFD and MFD only.
 
 ## Screenshots
 
@@ -21,7 +23,12 @@ Captured from the running app with the live X-Plane 12 screen (default Cessna 17
 
 | GNS 530 | GNS 430 |
 |---|---|
-| ![GNS 530 bezel with the live X-Plane moving map](screenshots/gns530.jpg) | ![GNS 430 bezel with the live X-Plane nav page](screenshots/gns430.jpg) |
+| ![GNS 530 bezel with the live X-Plane moving map](screenshots/gns530.jpg) | ![GNS 430 bezel with the live X-Plane nav page](screenshots/gns430.jpg) | 
+<img width="4032" height="3024" alt="No Bezel on Safari 10" src="https://github.com/user-attachments/assets/f4896d6c-5010-40d6-95f9-dc98720f72b7" />
+
+<img width="4032" height="3024" alt="Hide Bezel on Menu" src="https://github.com/user-attachments/assets/9709e2de-0bbd-466e-be15-5bdb057e1a89" />
+<img width="4032" height="3024" alt="No Bezel on Home Screen" src="https://github.com/user-attachments/assets/e4c0c0ae-970a-4a1a-8680-cdaf4e009b9a" />
+See screenshots/G1000_HideBezel.mp4 to see the drawing speed on iPad 4.
 
 ## Features
 - **Automatic device detection** – the plugin asks X-Plane which avionics the loaded
@@ -30,12 +37,15 @@ Captured from the running app with the live X-Plane 12 screen (default Cessna 17
 - **Real screen, no popups** – captured directly from the device's own render target,
   independent of your camera view
 - **Hand-drawn bezels** modelled on the real units, with a slightly used look
+- Bezel can be hidden for those who want to combine true hardware controls as in https://github.com/opiopan/simhid-g1000
+  Triple tap to display the menu. (screenshots/
 - **Dual knobs** – circle on the outer ring for the large knob, in the centre for the
   small knob, tap to push. G1000 RANGE knob: hold + drag = joystick pan
 - **Key hold** – e.g. hold CLR for the default map
 - Runs in Safari – add it to the Home Screen for a full-screen app. No App Store,
   no extra software on the tablet
 - Works with Laminar's default aircraft and add-ons that use the built-in G1000/GNS
+- Works with a 32-bit Gen 4 iPad running iPadOS 10.3.3. Connect with a lightening cable for quicker response. From Safari share menu, choose Add to Home Screen and launch from the home screen.
 
 ## Install
 1. Download the latest `XPGlassPad-vX.Y.Z.zip` from

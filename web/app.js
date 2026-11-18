@@ -17,6 +17,8 @@ const DETENT = 20;          // degrees of finger rotation per knob click
 const HOLD_MS = 500;        // key hold threshold for begin/end
 const $ = (s) => document.querySelector(s);
 
+// ---------------------------------------------------------------- Helper to support iPadOS 10.3.3 that doesn't know of pointer events.
+const hasPointer = 'PointerEvent' in window;
 // ---------------------------------------------------------------- i18n (German if the tablet is German, else English)
 const DE = (navigator.language || '').toLowerCase().startsWith('de');
 const T = DE ? {
@@ -25,12 +27,14 @@ const T = DE ? {
   menuKey: 'MENÜ', sound: 'Klick-Sound', ap: 'AP-Tasten (G1000)', auto: 'Gerät automatisch wählen', menu: 'Menü',
   dual: 'GNS 530 + 430 zusammen', pixel: 'Echte Display-Pixel (GNS)',
   lightAuto: 'Tastenbeleuchtung aus dem Sim', lightMan: 'Beleuchtung manuell',
+  screenOnly: 'Rahmen ausblenden',
 } : {
   noConn: 'No connection to X-Plane', wait: 'Waiting for image from X-Plane …', offline: 'not connected',
   noDev: 'The loaded aircraft uses no built-in X-Plane unit (G1000, GNS, MCDU/CDU). Add-ons like ToLiss or Zibo draw their own unit – support is coming.', menuHint: 'Menu: MENU key top left on the unit (no unit shown: tap the top centre).',
   menuKey: 'MENU', sound: 'Click sound', ap: 'AP keys (G1000)', auto: 'Pick device automatically', menu: 'Menu',
   dual: 'GNS 530 + 430 together', pixel: 'Real display pixels (GNS)',
   lightAuto: 'Key lighting from the sim', lightMan: 'Manual lighting',
+  screenOnly: 'Hide Bezel',
 };
 
 const opts = loadOpts();
@@ -45,7 +49,7 @@ const usable = (d) => d.bound && seen.has(d.key) && (FMS_ENABLED || !isFms(d.key
 
 // ---------------------------------------------------------------- options (per iPad)
 function loadOpts() {
-  let o = { sound: true, ap: true, auto: true, dual: true, pixel: false, lightAuto: true, lightVal: 0 };
+  let o = { sound: true, ap: true, auto: true, dual: true, pixel: false, lightAuto: true, lightVal: 0, screenOnly: false };
   try { Object.assign(o, JSON.parse(localStorage.getItem('glasspad') || '{}')); } catch (e) {}
   return o;
 }
@@ -414,7 +418,8 @@ function buildPanel(dev, root) {
   bz.style.cssText = `left:0;top:0;width:${def.w}px;height:${def.h}px`;
   root.appendChild(bz);
 
-  for (const it of def.items) {
+  const items = opts.screenOnly ? def.items.filter(it => it.t === 'screen') : def.items;
+  for (const it of items) {
     const id = dev.key + ':' + it.t + ':' + it.x + ':' + it.y;
     switch (it.t) {
       case 'recess': case 'slot': case 'pocket': case 'strip': {
@@ -464,12 +469,14 @@ function buildPanel(dev, root) {
   }
   // small MENU key top-left on every unit (opens the settings bar) – styled like the unit's own keys
   // (MCDU: round key in place of the top-left mounting hole; others: bottom-left corner, away from the iOS status bar)
-  const MK = { g1000: [168, def.h - 26, 54, 22, ''], gns530: [44, def.h - 24, 54, 22, ''], gns430: [44, def.h - 22, 54, 20, ''],
-               mcdu: [33, 90, 30, 30, ' round'], cdu: [110, def.h - 26, 58, 24, ''] }[dev.kind];
-  if (MK) root.appendChild(makeKey({ x: MK[0], y: MK[1], w: MK[2], h: MK[3], html: T.menuKey, cls: 'menukey fn tiny' + MK[4], menu: true }, dev.key + ':menu'));
-  // night: one darkening layer over the housing (keys, labels, knobs and screen sit above it)
-  root.appendChild(el('div', 'night'));
-  root.insertBefore(scuffs(def, dev.kind), bz.nextSibling);
+  if (!opts.screenOnly) {
+    const MK = { g1000: [168, def.h - 26, 54, 22, ''], gns530: [44, def.h - 24, 54, 22, ''], gns430: [44, def.h - 22, 54, 20, ''],
+                 mcdu: [33, 90, 30, 30, ' round'], cdu: [110, def.h - 26, 58, 24, ''] }[dev.kind];
+    if (MK) root.appendChild(makeKey({ x: MK[0], y: MK[1], w: MK[2], h: MK[3], html: T.menuKey, cls: 'menukey fn tiny' + MK[4], menu: true }, dev.key + ':menu'));
+    // night: one darkening layer over the housing (keys, labels, knobs and screen sit above it)
+    root.appendChild(el('div', 'night'));
+    root.insertBefore(scuffs(def, dev.kind), bz.nextSibling);
+  }
   return { dev, screenEl, imgEl, canvasEl, textEl, w: def.w, h: def.h, el: root };
 }
 
@@ -479,7 +486,8 @@ const GAP = 28;
 function layout(devs) {
   const root = $('#bezel');
   root.innerHTML = '';
-  delete root.dataset.empty;
+  // Fixes bug in safari <= 10.
+  root.removeAttribute('data-empty');
   root.dataset.kind = devs.length === 1 ? devs[0].kind : 'multi';
   const built = devs.map((dev) => {
     const p = el('div', 'panel');
@@ -593,13 +601,17 @@ function makeKey(it, id) {
   wear(e, id);
   let timer = null, began = false, active = false;
   if (it.menu) {
-    e.addEventListener('pointerdown', (ev) => { ev.preventDefault(); e.classList.add('down'); click(); });
-    e.addEventListener('pointerup', () => { e.classList.remove('down'); toggleBar(); });
-    e.addEventListener('pointercancel', () => e.classList.remove('down'));
+    // Use touch events if no pointer events are supported.
+    const down = (ev) => { ev.preventDefault(); e.classList.add('down'); click(); };
+    const up = () => { e.classList.remove('down'); toggleBar(); };
+    const cancel = () => e.classList.remove('down');
+    e.addEventListener(hasPointer ? 'pointerdown' : 'touchstart', down);
+    e.addEventListener(hasPointer ? 'pointerup' : 'touchend', up);
+    e.addEventListener(hasPointer ? 'pointercancel' : 'touchcancel', cancel);   
     return e;
   }
-  e.addEventListener('pointerdown', (ev) => {
-    ev.preventDefault(); e.setPointerCapture(ev.pointerId);
+  e.addEventListener(hasPointer ? 'pointerdown' : 'touchstart', (ev) => {
+    ev.preventDefault(); if (hasPointer) e.setPointerCapture(ev.pointerId);
     active = true; began = false; e.classList.add('down'); click();
     timer = setTimeout(() => { began = true; send(it.cmd, 'begin'); }, HOLD_MS);
   });
@@ -608,8 +620,8 @@ function makeKey(it, id) {
     clearTimeout(timer); e.classList.remove('down');
     if (began) send(it.cmd, 'end'); else send(it.cmd, 'once');
   };
-  e.addEventListener('pointerup', up);
-  e.addEventListener('pointercancel', up);
+  e.addEventListener(hasPointer ? 'pointerup' : 'touchend', up);
+  e.addEventListener(hasPointer ? 'pointercancel' : 'touchcancel', up);
   return e;
 }
 
@@ -627,16 +639,22 @@ function makeRocker(it, id) {
     k.style.justifyContent = 'space-between'; k.style.padding = '10px 0';
     k.innerHTML = `<span>${SVG.triUp}</span><span style="font-size:14px">RNG</span><span>${SVG.triDn}</span>`;
     wrap.appendChild(k);
-    k.addEventListener('pointerdown', (ev) => {
+    const press = (ev) => {
       ev.preventDefault();
       const r = k.getBoundingClientRect();
-      const upper = ev.clientY < r.top + r.height / 2;
+      const y = hasPointer ? ev.clientY : ev.touches[0].clientY;
+      const upper = y < r.top + r.height / 2;
       k.classList.add('down'); click();
       k.style.transform = `translate(-50%,-50%) perspective(200px) rotateX(${upper ? 6 : -6}deg)`;
       send(upper ? it.up : it.dn);
-    });
+    };
+    k.addEventListener(hasPointer ? 'pointerdown' : 'touchstart', press);
     const rel = () => { k.classList.remove('down'); k.style.transform = ''; };
-    k.addEventListener('pointerup', rel); k.addEventListener('pointercancel', rel); k.addEventListener('pointerleave', rel);
+    if (hasPointer) {
+      k.addEventListener('pointerup', rel); k.addEventListener('pointercancel', rel); k.addEventListener('pointerleave', rel);
+    } else {
+      k.addEventListener('touchend', rel); k.addEventListener('touchcancel', rel);
+    }
   } else {
     const w = it.w / 3;
     mk(SVG.triDn, it.dn, -w, 0, w - 4, it.h);
@@ -700,26 +718,31 @@ function makeKnob(it, id) {
   let st = null;
   const centre = () => { const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
 
-  e.addEventListener('pointerdown', (ev) => {
-    ev.preventDefault(); e.setPointerCapture(ev.pointerId);
+  e.addEventListener(hasPointer ? 'pointerdown' : 'touchstart', (ev) => {
+    ev.preventDefault(); if (hasPointer) e.setPointerCapture(ev.pointerId);
+
     const [cx, cy] = centre();
-    const scale = currentScale * parseFloat(e.closest('.panel')?.dataset.k || 1);
-    const d = Math.hypot(ev.clientX - cx, ev.clientY - cy) / scale;
+    const panel = e.closest('.panel');
+    const scale = currentScale * parseFloat(panel ? panel.dataset.k : 1);
+    const coord = hasPointer ? ev : ev.touches[0];
+    const d = Math.hypot(coord.clientX - cx, coord.clientY - cy) / scale;
     const part = dual ? (d > it.ri * 1.12 ? 'outer' : 'inner') : 'outer';
-    st = { cx, cy, part, a: Math.atan2(ev.clientY - cy, ev.clientX - cx), acc: 0, moved: 0, t0: performance.now(),
-           x0: ev.clientX, y0: ev.clientY, pan: false, panTimer: null, panDir: null, panRep: null };
+    st = { cx, cy, part, a: Math.atan2(coord.clientY - cy, coord.clientX - cx), acc: 0, moved: 0, t0: performance.now(),
+           x0: coord.clientX, y0: coord.clientY, pan: false, panTimer: null, panDir: null, panRep: null };
     e.classList.add('active');
     (part === 'outer' && dual ? ring : cap).classList.add('on');
     if (it.pan) {
       st.panTimer = setTimeout(() => { if (st && st.moved < 8) { st.pan = true; e.classList.add('pushed'); click(.6); } }, 380);
     }
   });
-
-  e.addEventListener('pointermove', (ev) => {
+ 
+  // Factored out to handle both pointermove and touchmove.
+  const handleMove = (coord) => {
     if (!st) return;
-    st.moved = Math.max(st.moved, Math.hypot(ev.clientX - st.x0, ev.clientY - st.y0));
+    const x = coord.clientX; const y = coord.clientY;
+    st.moved = Math.max(st.moved, Math.hypot(x - st.x0, y - st.y0));
     if (st.pan) { // joystick
-      const dx = ev.clientX - st.x0, dy = ev.clientY - st.y0;
+      const dx = x - st.x0, dy = y - st.y0;
       let dir = null;
       if (Math.hypot(dx, dy) > 22) {
         const a = (Math.atan2(dy, dx) * 180 / Math.PI + 360 + 22.5) % 360;
@@ -731,11 +754,11 @@ function makeKnob(it, id) {
       }
       return;
     }
-    const a = Math.atan2(ev.clientY - st.cy, ev.clientX - st.cx);
+    const a = Math.atan2(y - st.cy, x - st.cx);
     let da = (a - st.a) * 180 / Math.PI;
     if (da > 180) da -= 360; if (da < -180) da += 360;
     // ignore wild jumps when the finger passes over the centre
-    const dc = Math.hypot(ev.clientX - st.cx, ev.clientY - st.cy);
+    const dc = Math.hypot(x - st.cx, y - st.cy);
     st.a = a;
     if (dc < 8) return;
     st.acc += da;
@@ -743,7 +766,10 @@ function makeKnob(it, id) {
     const [upCmd, dnCmd] = cmds(st.part);
     while (st.acc >= DETENT) { st.acc -= DETENT; queueStep(upCmd); click(.55); }
     while (st.acc <= -DETENT) { st.acc += DETENT; queueStep(dnCmd); click(.55); }
-  });
+  };
+
+  if (hasPointer) e.addEventListener('pointermove', (ev) => handleMove(ev));
+  else e.addEventListener('touchmove', (ev) => { ev.preventDefault(); handleMove(ev.touches[0]); }, { passive: false });   
 
   const end = () => {
     if (!st) return;
@@ -757,8 +783,8 @@ function makeKnob(it, id) {
     e.classList.remove('active'); ring.classList.remove('on'); cap.classList.remove('on');
     st = null;
   };
-  e.addEventListener('pointerup', end);
-  e.addEventListener('pointercancel', end);
+  e.addEventListener(hasPointer ? 'pointerup' : 'touchend', end);
+  e.addEventListener(hasPointer ? 'pointercancel' : 'touchcancel', end);
 
   // mouse wheel (desktop testing): plain wheel = outer, shift+wheel = inner
   e.addEventListener('wheel', (ev) => {
@@ -773,6 +799,15 @@ function makeKnob(it, id) {
 // ---------------------------------------------------------------- scale to viewport
 let currentScale = 1;
 function fit() {
+  if (opts.screenOnly) {
+    currentScale = 1;
+    $('#bezel').style.transform = 'none';
+    const scr = document.querySelector('.screen');
+    if (scr && /iPad/.test(navigator.userAgent) && !window.navigator.standalone) {
+      scr.style.setProperty('height', window.innerHeight + 'px', 'important');
+    }
+    return;
+  }
   const root = $('#bezel');
   const w = parseFloat(root.style.width), h = parseFloat(root.style.height);
   if (!w) return;
@@ -931,6 +966,7 @@ function show(key, byUser, force) {
   const gen = ++streamGen;
   panels = layout(devs);
   document.body.classList.add('has-dev');
+  document.body.classList.toggle('screen-only', opts.screenOnly);
   panels.forEach((p) => stream(p, gen));
   applyLight();
   renderBar();
@@ -1011,8 +1047,8 @@ function openBar() {
   clearTimeout(barTimer); barTimer = setTimeout(() => $('#bar').classList.add('hidden'), 6000);
 }
 function toggleBar() { if ($('#bar').classList.contains('hidden')) openBar(); else { clearTimeout(barTimer); $('#bar').classList.add('hidden'); } }
-$('#handle').addEventListener('pointerdown', (e) => { e.preventDefault(); openBar(); });
-$('#bar').addEventListener('pointerdown', () => { clearTimeout(barTimer); barTimer = setTimeout(() => $('#bar').classList.add('hidden'), 6000); });
+$('#handle').addEventListener(hasPointer ? 'pointerdown' : 'touchstart', (e) => { e.preventDefault(); openBar(); });
+$('#bar').addEventListener(hasPointer ? 'pointerdown' : 'touchstart', () => { clearTimeout(barTimer); barTimer = setTimeout(() => $('#bar').classList.add('hidden'), 6000); });
 
 let toastTimer = null;
 function toast(t) {
@@ -1022,12 +1058,13 @@ function toast(t) {
 
 document.documentElement.lang = DE ? 'de' : 'en';
 $('#handle').setAttribute('aria-label', T.menu);
-for (const [id, key] of [['#opt-sound', 'sound'], ['#opt-ap', 'ap'], ['#opt-auto', 'auto'], ['#opt-dual', 'dual'], ['#opt-pixel', 'pixel'], ['#opt-light', 'lightAuto']]) {
-  $(id).parentElement.lastChild.textContent = ' ' + T[key];
-  const c = $(id); c.checked = !!opts[key];
+for (const [id, key] of [['#opt-sound', 'sound'], ['#opt-ap', 'ap'], ['#opt-auto', 'auto'], ['#opt-dual', 'dual'], ['#opt-pixel', 'pixel'], ['#opt-light', 'lightAuto'], ['#opt-screenonly', 'screenOnly']]) {
+  const c = $(id);
+  c.parentElement.lastChild.textContent = ' ' + T[key];
+  c.checked = !!opts[key];
   c.addEventListener('change', () => {
     opts[key] = c.checked; saveOpts();
-    if (key === 'ap' && current) show(current, false, true);
+    if ((key === 'ap' || key === 'screenOnly') && current) show(current, false, true);
     if (key === 'lightAuto') { $('#opt-lightval').disabled = c.checked; applyLight(); }
     if (key === 'auto' || key === 'dual') { manualPick = false; const k = status && pickAuto(); if (k) show(k, false, true); }
   });
@@ -1045,11 +1082,20 @@ let wakeLock = null;
 async function keepAwake() {
   try { if ('wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => (wakeLock = null)); } } catch (e) {}
 }
-document.addEventListener('pointerdown', keepAwake);
+// Triple-tap opens the settings bar in screen-only mode (no MENU key visible)
+let tapCount = 0, tapTimer = null;
+document.addEventListener(hasPointer ? 'pointerdown' : 'touchstart', (e) => {
+  if (!opts.screenOnly) return;
+  tapCount++;
+  clearTimeout(tapTimer);
+  if (tapCount === 3) { tapCount = 0; toggleBar(); }
+  else { tapTimer = setTimeout(() => { tapCount = 0; }, 300); }
+});
+document.addEventListener(hasPointer ? 'pointerdown' : 'touchstart', keepAwake);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 document.addEventListener('gesturechange', (e) => e.preventDefault());
-document.addEventListener('touchmove', (e) => { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+document.addEventListener('touchmove', (e) => { e.preventDefault(); }, { passive: false });
 let lastTouchEnd = 0;
 document.addEventListener('touchend', (e) => { const n = Date.now(); if (n - lastTouchEnd < 350) e.preventDefault(); lastTouchEnd = n; }, { passive: false });
 document.addEventListener('dblclick', (e) => e.preventDefault());
