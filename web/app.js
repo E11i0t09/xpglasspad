@@ -27,12 +27,14 @@ const T = DE ? {
   menuKey: 'MENÜ', sound: 'Klick-Sound', ap: 'AP-Tasten (G1000)', auto: 'Gerät automatisch wählen', menu: 'Menü',
   dual: 'GNS 530 + 430 zusammen', pixel: 'Echte Display-Pixel (GNS)',
   lightAuto: 'Tastenbeleuchtung aus dem Sim', lightMan: 'Beleuchtung manuell',
+  screenOnly: 'Rahmen ausblenden',
 } : {
   noConn: 'No connection to X-Plane', wait: 'Waiting for image from X-Plane …', offline: 'not connected',
   noDev: 'The loaded aircraft uses no built-in X-Plane unit (G1000, GNS, MCDU/CDU). Add-ons like ToLiss or Zibo draw their own unit – support is coming.', menuHint: 'Menu: MENU key top left on the unit (no unit shown: tap the top centre).',
   menuKey: 'MENU', sound: 'Click sound', ap: 'AP keys (G1000)', auto: 'Pick device automatically', menu: 'Menu',
   dual: 'GNS 530 + 430 together', pixel: 'Real display pixels (GNS)',
   lightAuto: 'Key lighting from the sim', lightMan: 'Manual lighting',
+  screenOnly: 'Hide Bezel',
 };
 
 const opts = loadOpts();
@@ -47,7 +49,7 @@ const usable = (d) => d.bound && seen.has(d.key) && (FMS_ENABLED || !isFms(d.key
 
 // ---------------------------------------------------------------- options (per iPad)
 function loadOpts() {
-  let o = { sound: true, ap: true, auto: true, dual: true, pixel: false, lightAuto: true, lightVal: 0 };
+  let o = { sound: true, ap: true, auto: true, dual: true, pixel: false, lightAuto: true, lightVal: 0, screenOnly: false };
   try { Object.assign(o, JSON.parse(localStorage.getItem('glasspad') || '{}')); } catch (e) {}
   return o;
 }
@@ -416,7 +418,8 @@ function buildPanel(dev, root) {
   bz.style.cssText = `left:0;top:0;width:${def.w}px;height:${def.h}px`;
   root.appendChild(bz);
 
-  for (const it of def.items) {
+  const items = opts.screenOnly ? def.items.filter(it => it.t === 'screen') : def.items;
+  for (const it of items) {
     const id = dev.key + ':' + it.t + ':' + it.x + ':' + it.y;
     switch (it.t) {
       case 'recess': case 'slot': case 'pocket': case 'strip': {
@@ -466,12 +469,14 @@ function buildPanel(dev, root) {
   }
   // small MENU key top-left on every unit (opens the settings bar) – styled like the unit's own keys
   // (MCDU: round key in place of the top-left mounting hole; others: bottom-left corner, away from the iOS status bar)
-  const MK = { g1000: [168, def.h - 26, 54, 22, ''], gns530: [44, def.h - 24, 54, 22, ''], gns430: [44, def.h - 22, 54, 20, ''],
-               mcdu: [33, 90, 30, 30, ' round'], cdu: [110, def.h - 26, 58, 24, ''] }[dev.kind];
-  if (MK) root.appendChild(makeKey({ x: MK[0], y: MK[1], w: MK[2], h: MK[3], html: T.menuKey, cls: 'menukey fn tiny' + MK[4], menu: true }, dev.key + ':menu'));
-  // night: one darkening layer over the housing (keys, labels, knobs and screen sit above it)
-  root.appendChild(el('div', 'night'));
-  root.insertBefore(scuffs(def, dev.kind), bz.nextSibling);
+  if (!opts.screenOnly) {
+    const MK = { g1000: [168, def.h - 26, 54, 22, ''], gns530: [44, def.h - 24, 54, 22, ''], gns430: [44, def.h - 22, 54, 20, ''],
+                 mcdu: [33, 90, 30, 30, ' round'], cdu: [110, def.h - 26, 58, 24, ''] }[dev.kind];
+    if (MK) root.appendChild(makeKey({ x: MK[0], y: MK[1], w: MK[2], h: MK[3], html: T.menuKey, cls: 'menukey fn tiny' + MK[4], menu: true }, dev.key + ':menu'));
+    // night: one darkening layer over the housing (keys, labels, knobs and screen sit above it)
+    root.appendChild(el('div', 'night'));
+    root.insertBefore(scuffs(def, dev.kind), bz.nextSibling);
+  }
   return { dev, screenEl, imgEl, canvasEl, textEl, w: def.w, h: def.h, el: root };
 }
 
@@ -794,6 +799,15 @@ function makeKnob(it, id) {
 // ---------------------------------------------------------------- scale to viewport
 let currentScale = 1;
 function fit() {
+  if (opts.screenOnly) {
+    currentScale = 1;
+    $('#bezel').style.transform = 'none';
+    const scr = document.querySelector('.screen');
+    if (scr && /iPad/.test(navigator.userAgent) && !window.navigator.standalone) {
+      scr.style.setProperty('height', window.innerHeight + 'px', 'important');
+    }
+    return;
+  }
   const root = $('#bezel');
   const w = parseFloat(root.style.width), h = parseFloat(root.style.height);
   if (!w) return;
@@ -952,6 +966,7 @@ function show(key, byUser, force) {
   const gen = ++streamGen;
   panels = layout(devs);
   document.body.classList.add('has-dev');
+  document.body.classList.toggle('screen-only', opts.screenOnly);
   panels.forEach((p) => stream(p, gen));
   applyLight();
   renderBar();
@@ -1043,12 +1058,13 @@ function toast(t) {
 
 document.documentElement.lang = DE ? 'de' : 'en';
 $('#handle').setAttribute('aria-label', T.menu);
-for (const [id, key] of [['#opt-sound', 'sound'], ['#opt-ap', 'ap'], ['#opt-auto', 'auto'], ['#opt-dual', 'dual'], ['#opt-pixel', 'pixel'], ['#opt-light', 'lightAuto']]) {
-  $(id).parentElement.lastChild.textContent = ' ' + T[key];
-  const c = $(id); c.checked = !!opts[key];
+for (const [id, key] of [['#opt-sound', 'sound'], ['#opt-ap', 'ap'], ['#opt-auto', 'auto'], ['#opt-dual', 'dual'], ['#opt-pixel', 'pixel'], ['#opt-light', 'lightAuto'], ['#opt-screenonly', 'screenOnly']]) {
+  const c = $(id);
+  c.parentElement.lastChild.textContent = ' ' + T[key];
+  c.checked = !!opts[key];
   c.addEventListener('change', () => {
     opts[key] = c.checked; saveOpts();
-    if (key === 'ap' && current) show(current, false, true);
+    if ((key === 'ap' || key === 'screenOnly') && current) show(current, false, true);
     if (key === 'lightAuto') { $('#opt-lightval').disabled = c.checked; applyLight(); }
     if (key === 'auto' || key === 'dual') { manualPick = false; const k = status && pickAuto(); if (k) show(k, false, true); }
   });
@@ -1066,11 +1082,20 @@ let wakeLock = null;
 async function keepAwake() {
   try { if ('wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => (wakeLock = null)); } } catch (e) {}
 }
+// Triple-tap opens the settings bar in screen-only mode (no MENU key visible)
+let tapCount = 0, tapTimer = null;
+document.addEventListener(hasPointer ? 'pointerdown' : 'touchstart', (e) => {
+  if (!opts.screenOnly) return;
+  tapCount++;
+  clearTimeout(tapTimer);
+  if (tapCount === 3) { tapCount = 0; toggleBar(); }
+  else { tapTimer = setTimeout(() => { tapCount = 0; }, 300); }
+});
 document.addEventListener(hasPointer ? 'pointerdown' : 'touchstart', keepAwake);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 document.addEventListener('gesturechange', (e) => e.preventDefault());
-document.addEventListener('touchmove', (e) => { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+document.addEventListener('touchmove', (e) => { e.preventDefault(); }, { passive: false });
 let lastTouchEnd = 0;
 document.addEventListener('touchend', (e) => { const n = Date.now(); if (n - lastTouchEnd < 350) e.preventDefault(); lastTouchEnd = n; }, { passive: false });
 document.addEventListener('dblclick', (e) => e.preventDefault());
