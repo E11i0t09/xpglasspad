@@ -17,6 +17,8 @@ const DETENT = 20;          // degrees of finger rotation per knob click
 const HOLD_MS = 500;        // key hold threshold for begin/end
 const $ = (s) => document.querySelector(s);
 
+// ---------------------------------------------------------------- Helper to support iPadOS 10.3.3 that doesn't know of pointer events.
+const hasPointer = 'PointerEvent' in window;
 // ---------------------------------------------------------------- i18n (German if the tablet is German, else English)
 const DE = (navigator.language || '').toLowerCase().startsWith('de');
 const T = DE ? {
@@ -479,7 +481,8 @@ const GAP = 28;
 function layout(devs) {
   const root = $('#bezel');
   root.innerHTML = '';
-  delete root.dataset.empty;
+  // Fixes bug in safari <= 10.
+  root.removeAttribute('data-empty');
   root.dataset.kind = devs.length === 1 ? devs[0].kind : 'multi';
   const built = devs.map((dev) => {
     const p = el('div', 'panel');
@@ -593,13 +596,17 @@ function makeKey(it, id) {
   wear(e, id);
   let timer = null, began = false, active = false;
   if (it.menu) {
-    e.addEventListener('pointerdown', (ev) => { ev.preventDefault(); e.classList.add('down'); click(); });
-    e.addEventListener('pointerup', () => { e.classList.remove('down'); toggleBar(); });
-    e.addEventListener('pointercancel', () => e.classList.remove('down'));
+    // Use touch events if no pointer events are supported.
+    const down = (ev) => { ev.preventDefault(); e.classList.add('down'); click(); };
+    const up = () => { e.classList.remove('down'); toggleBar(); };
+    const cancel = () => e.classList.remove('down');
+    e.addEventListener(hasPointer ? 'pointerdown' : 'touchstart', down);
+    e.addEventListener(hasPointer ? 'pointerup' : 'touchend', up);
+    e.addEventListener(hasPointer ? 'pointercancel' : 'touchcancel', cancel);   
     return e;
   }
-  e.addEventListener('pointerdown', (ev) => {
-    ev.preventDefault(); e.setPointerCapture(ev.pointerId);
+  e.addEventListener(hasPointer ? 'pointerdown' : 'touchstart', (ev) => {
+    ev.preventDefault(); if (hasPointer) e.setPointerCapture(ev.pointerId);
     active = true; began = false; e.classList.add('down'); click();
     timer = setTimeout(() => { began = true; send(it.cmd, 'begin'); }, HOLD_MS);
   });
@@ -608,8 +615,8 @@ function makeKey(it, id) {
     clearTimeout(timer); e.classList.remove('down');
     if (began) send(it.cmd, 'end'); else send(it.cmd, 'once');
   };
-  e.addEventListener('pointerup', up);
-  e.addEventListener('pointercancel', up);
+  e.addEventListener(hasPointer ? 'pointerup' : 'touchend', up);
+  e.addEventListener(hasPointer ? 'pointercancel' : 'touchcancel', up);
   return e;
 }
 
@@ -627,16 +634,22 @@ function makeRocker(it, id) {
     k.style.justifyContent = 'space-between'; k.style.padding = '10px 0';
     k.innerHTML = `<span>${SVG.triUp}</span><span style="font-size:14px">RNG</span><span>${SVG.triDn}</span>`;
     wrap.appendChild(k);
-    k.addEventListener('pointerdown', (ev) => {
+    const press = (ev) => {
       ev.preventDefault();
       const r = k.getBoundingClientRect();
-      const upper = ev.clientY < r.top + r.height / 2;
+      const y = hasPointer ? ev.clientY : ev.touches[0].clientY;
+      const upper = y < r.top + r.height / 2;
       k.classList.add('down'); click();
       k.style.transform = `translate(-50%,-50%) perspective(200px) rotateX(${upper ? 6 : -6}deg)`;
       send(upper ? it.up : it.dn);
-    });
+    };
+    k.addEventListener(hasPointer ? 'pointerdown' : 'touchstart', press);
     const rel = () => { k.classList.remove('down'); k.style.transform = ''; };
-    k.addEventListener('pointerup', rel); k.addEventListener('pointercancel', rel); k.addEventListener('pointerleave', rel);
+    if (hasPointer) {
+      k.addEventListener('pointerup', rel); k.addEventListener('pointercancel', rel); k.addEventListener('pointerleave', rel);
+    } else {
+      k.addEventListener('touchend', rel); k.addEventListener('touchcancel', rel);
+    }
   } else {
     const w = it.w / 3;
     mk(SVG.triDn, it.dn, -w, 0, w - 4, it.h);
@@ -700,26 +713,31 @@ function makeKnob(it, id) {
   let st = null;
   const centre = () => { const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
 
-  e.addEventListener('pointerdown', (ev) => {
-    ev.preventDefault(); e.setPointerCapture(ev.pointerId);
+  e.addEventListener(hasPointer ? 'pointerdown' : 'touchstart', (ev) => {
+    ev.preventDefault(); if (hasPointer) e.setPointerCapture(ev.pointerId);
+
     const [cx, cy] = centre();
-    const scale = currentScale * parseFloat(e.closest('.panel')?.dataset.k || 1);
-    const d = Math.hypot(ev.clientX - cx, ev.clientY - cy) / scale;
+    const panel = e.closest('.panel');
+    const scale = currentScale * parseFloat(panel ? panel.dataset.k : 1);
+    const coord = hasPointer ? ev : ev.touches[0];
+    const d = Math.hypot(coord.clientX - cx, coord.clientY - cy) / scale;
     const part = dual ? (d > it.ri * 1.12 ? 'outer' : 'inner') : 'outer';
-    st = { cx, cy, part, a: Math.atan2(ev.clientY - cy, ev.clientX - cx), acc: 0, moved: 0, t0: performance.now(),
-           x0: ev.clientX, y0: ev.clientY, pan: false, panTimer: null, panDir: null, panRep: null };
+    st = { cx, cy, part, a: Math.atan2(coord.clientY - cy, coord.clientX - cx), acc: 0, moved: 0, t0: performance.now(),
+           x0: coord.clientX, y0: coord.clientY, pan: false, panTimer: null, panDir: null, panRep: null };
     e.classList.add('active');
     (part === 'outer' && dual ? ring : cap).classList.add('on');
     if (it.pan) {
       st.panTimer = setTimeout(() => { if (st && st.moved < 8) { st.pan = true; e.classList.add('pushed'); click(.6); } }, 380);
     }
   });
-
-  e.addEventListener('pointermove', (ev) => {
+ 
+  // Factored out to handle both pointermove and touchmove.
+  const handleMove = (coord) => {
     if (!st) return;
-    st.moved = Math.max(st.moved, Math.hypot(ev.clientX - st.x0, ev.clientY - st.y0));
+    const x = coord.clientX; const y = coord.clientY;
+    st.moved = Math.max(st.moved, Math.hypot(x - st.x0, y - st.y0));
     if (st.pan) { // joystick
-      const dx = ev.clientX - st.x0, dy = ev.clientY - st.y0;
+      const dx = x - st.x0, dy = y - st.y0;
       let dir = null;
       if (Math.hypot(dx, dy) > 22) {
         const a = (Math.atan2(dy, dx) * 180 / Math.PI + 360 + 22.5) % 360;
@@ -731,11 +749,11 @@ function makeKnob(it, id) {
       }
       return;
     }
-    const a = Math.atan2(ev.clientY - st.cy, ev.clientX - st.cx);
+    const a = Math.atan2(y - st.cy, x - st.cx);
     let da = (a - st.a) * 180 / Math.PI;
     if (da > 180) da -= 360; if (da < -180) da += 360;
     // ignore wild jumps when the finger passes over the centre
-    const dc = Math.hypot(ev.clientX - st.cx, ev.clientY - st.cy);
+    const dc = Math.hypot(x - st.cx, y - st.cy);
     st.a = a;
     if (dc < 8) return;
     st.acc += da;
@@ -743,7 +761,10 @@ function makeKnob(it, id) {
     const [upCmd, dnCmd] = cmds(st.part);
     while (st.acc >= DETENT) { st.acc -= DETENT; queueStep(upCmd); click(.55); }
     while (st.acc <= -DETENT) { st.acc += DETENT; queueStep(dnCmd); click(.55); }
-  });
+  };
+
+  if (hasPointer) e.addEventListener('pointermove', (ev) => handleMove(ev));
+  else e.addEventListener('touchmove', (ev) => { ev.preventDefault(); handleMove(ev.touches[0]); }, { passive: false });   
 
   const end = () => {
     if (!st) return;
@@ -757,8 +778,8 @@ function makeKnob(it, id) {
     e.classList.remove('active'); ring.classList.remove('on'); cap.classList.remove('on');
     st = null;
   };
-  e.addEventListener('pointerup', end);
-  e.addEventListener('pointercancel', end);
+  e.addEventListener(hasPointer ? 'pointerup' : 'touchend', end);
+  e.addEventListener(hasPointer ? 'pointercancel' : 'touchcancel', end);
 
   // mouse wheel (desktop testing): plain wheel = outer, shift+wheel = inner
   e.addEventListener('wheel', (ev) => {
@@ -1011,8 +1032,8 @@ function openBar() {
   clearTimeout(barTimer); barTimer = setTimeout(() => $('#bar').classList.add('hidden'), 6000);
 }
 function toggleBar() { if ($('#bar').classList.contains('hidden')) openBar(); else { clearTimeout(barTimer); $('#bar').classList.add('hidden'); } }
-$('#handle').addEventListener('pointerdown', (e) => { e.preventDefault(); openBar(); });
-$('#bar').addEventListener('pointerdown', () => { clearTimeout(barTimer); barTimer = setTimeout(() => $('#bar').classList.add('hidden'), 6000); });
+$('#handle').addEventListener(hasPointer ? 'pointerdown' : 'touchstart', (e) => { e.preventDefault(); openBar(); });
+$('#bar').addEventListener(hasPointer ? 'pointerdown' : 'touchstart', () => { clearTimeout(barTimer); barTimer = setTimeout(() => $('#bar').classList.add('hidden'), 6000); });
 
 let toastTimer = null;
 function toast(t) {
@@ -1045,7 +1066,7 @@ let wakeLock = null;
 async function keepAwake() {
   try { if ('wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => (wakeLock = null)); } } catch (e) {}
 }
-document.addEventListener('pointerdown', keepAwake);
+document.addEventListener(hasPointer ? 'pointerdown' : 'touchstart', keepAwake);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 document.addEventListener('gesturechange', (e) => e.preventDefault());

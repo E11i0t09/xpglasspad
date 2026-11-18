@@ -68,7 +68,7 @@ html, body {
 .screen.pixel canvas { display: block; }
 .screen.pixel img { display: none; }
 /* one or two instruments inside #bezel */
-.panel { position: absolute; transform-origin: 0 0; }
+.panel { position: absolute; transform-origin: 0 0; touch-action: none; }
 .screen .glass {
   position: absolute; inset: 0; pointer-events: none;
   background: linear-gradient(155deg, rgba(255,255,255,.06), rgba(255,255,255,0) 35%, rgba(255,255,255,0) 70%, rgba(255,255,255,.025));
