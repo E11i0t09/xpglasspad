@@ -21,9 +21,14 @@ Optionall you can hide the bezel and use the entire screen estate for the G1000 
 
 Captured from the running app with the live X-Plane 12 screen (default Cessna 172 with GNS 530 + GNS 430):
 
-| GNS 530 | GNS 430 | G1000 MFD |
-|---|---|---|
-| ![GNS 530 bezel with the live X-Plane moving map](screenshots/gns530.jpg) | ![GNS 430 bezel with the live X-Plane nav page](screenshots/gns430.jpg) | ![G1000 Hide Bezel mode](screenshots/G1000_HideBezel.mp4)|
+| GNS 530 | GNS 430 |
+|---|---|
+| ![GNS 530 bezel with the live X-Plane moving map](screenshots/gns530.jpg) | ![GNS 430 bezel with the live X-Plane nav page](screenshots/gns430.jpg) | 
+<img width="4032" height="3024" alt="No Bezel on Safari 10" src="https://github.com/user-attachments/assets/f4896d6c-5010-40d6-95f9-dc98720f72b7" />
+
+<img width="4032" height="3024" alt="Hide Bezel on Menu" src="https://github.com/user-attachments/assets/9709e2de-0bbd-466e-be15-5bdb057e1a89" />
+<img width="4032" height="3024" alt="No Bezel on Home Screen" src="https://github.com/user-attachments/assets/e4c0c0ae-970a-4a1a-8680-cdaf4e009b9a" />
+![G1000 Hide Bezel mode response speed on iPad 4](screenshots/G1000_HideBezel.mp4)|
 
 ## Features
 - **Automatic device detection** – the plugin asks X-Plane which avionics the loaded
